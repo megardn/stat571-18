@@ -1,0 +1,12 @@
+---
+title: "STAT571 HW1 Group 18 - Case 3"
+output: html_notebook
+---
+
+
+Case 3: MLB
+```{r}
+print('Baseball')
+```
+
+
