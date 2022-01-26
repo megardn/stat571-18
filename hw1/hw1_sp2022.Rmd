@@ -40,11 +40,9 @@ pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2)
 
 This is a fast-paced course that covers a lot of material. There will be a large amount of references. You may need to do your own research to fill in the gaps in between lectures and homework/projects. It is impossible to learn data science without getting your hands dirty. Please budget your time evenly. Last-minute work ethic will not work for this course. 
 
-Homework in this course is different from your usual homework assignment as a typical student. Most of the time, they are built over real case studies.  While you will be applying methods covered in lectures, you will also find that extra teaching materials appear here.  The focus will be always on the goals of the study, the usefulness of the data gathered, and the limitations in any conclusions you may draw. Always try to challenge your data analysis in a critical way. Frequently, there are no unique solutions. 
+Homework in this course is different from your usual homework assignment as a typical student. Most of the time, they are built over real case studies.  While you will be applying methods covered in lectures, you will also find that extra teaching materials appear here.  The focus will be always on the goals of the study, the usefulness of the data gathered, and the limitations in any conclusions you may draw. Always try to challenge your data analysis in a critical way. Frequently, there are no unique solutions.
 
 Case studies in each homework can be listed as your data science projects (e.g. on your CV) where you see fit. 
-
-
 
 ## Objectives 
 
@@ -96,20 +94,46 @@ The raw data is stored as `Survey_results_final.csv` on Canvas.
 
 i. We need to clean and select only the variables of interest. 
 
-Select only the variables Age, Gender, Education Level, Household Income in 2013, Sirius Listener?, Wharton Listener? and Time used to finish the survey.
+``` {r c1 load mturk}
+mturk <- read.csv("data/Survey_results_final.csv", header = TRUE, stringsAsFactors = F, na = "") #read data into df from csv and replacing blanks with NA ***strings as factors?
+colnames(mturk)
+```
 
-Change the variable names to be "age", "gender", "education", "income", "sirius", "wharton", "worktime".
+Select only the variables Age, Gender, Education Level, Household Income in 2013, Sirius Listener?, Wharton Listener? and Time used to finish the survey.Change the variable names to be "age", "gender", "education", "income", "sirius", "wharton", "worktime".
+
+``` {r c1 filt & rename}
+#write new df filtered to desired columns and rename column headers
+radio <- mturk %>% select(Answer.Age, Answer.Gender, Answer.Education, Answer.HouseHoldIncome, Answer.Sirius.Radio, Answer.Wharton.Radio, WorkTimeInSeconds) %>% rename(age = Answer.Age, gender = Answer.Gender, education = Answer.Education, income = Answer.HouseHoldIncome, sirius = Answer.Sirius.Radio, wharton = Answer.Wharton.Radio, worktime = WorkTimeInSeconds)
+
+#visualize data
+head(radio, 5)
+str(radio)
+sum(is.na(radio))
+```
 
 ii. Handle missing/wrongly filled values of the selected variables
-
 As in real world data with user input, the data is incomplete, with missing values, and has incorrect responses. There is no general rule for dealing with these problems beyond “use common sense.” In whatever case, explain what the problems were and how you addressed them. Be sure to explain your rationale for your chosen methods of handling issues with the data. Do not use Excel for this, however tempting it might be.
-
+``` {r}
+radio <- radio %>% drop_na(sirius) %>% drop_na(worktime) #drop any rows missing sirius/wharton listenership, since this is what we care about most
+```
 Tip: Reflect on the reasons for which data could be wrong or missing. How would you address each case? For this homework, if you are trying to predict missing values with regression, you are definitely overthinking. Keep it simple.
 
+``` {r c1}
+parse_number(radio$age) #find variables in age with no numerical values
+radio <- radio %>% mutate(age = na_if(age, "female")) %>% mutate(age = parse_number(age)) #replace identified chr variables with NA and recover entries with chr & int data
+
+#now that age is numeric, find min/max and drop data outside reasonable age range:
+radio %>% summarise(min=min(age, na.rm=T), max=max(age, na.rm=T))
+```
+```{r}
+sum(is.na(radio))
+```
 iii. Brief summary 
 
 Write a brief report to summarize all the variables collected. Include both summary statistics (including sample size) and graphical displays such as histograms or bar charts where appropriate. Comment on what you have found from this sample. (For example - it's very interesting to think about why would one work for a job that pays only 10cents/each survey? Who are those survey workers? The answer may be interesting even if it may not directly relate to our goal.)
-
+``` {r}
+levels(radio$education)
+```
 ## Sample properties
 
 The population from which the sample is drawn determines where the results of our analysis can be applied or generalized. We include some basic demographic information for the purpose of identifying sample bias, if any exists. Combine our data and the general population distribution in age, gender and income to try to characterize our sample on hand.
