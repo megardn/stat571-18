@@ -95,7 +95,7 @@ The raw data is stored as `Survey_results_final.csv` on Canvas.
 i. We need to clean and select only the variables of interest. 
 
 ``` {r c1 load mturk}
-mturk <- read.csv("data/Survey_results_final.csv", header = TRUE, stringsAsFactors = F, na = "") #read data into df from csv and replacing blanks with NA ***strings as factors?
+mturk <- read.csv("data/Survey_results_final.csv", header = TRUE, stringsAsFactors = F, na = "") #read data into df from csv and replacing blanks with NA
 colnames(mturk)
 ```
 
@@ -113,27 +113,59 @@ sum(is.na(radio))
 
 ii. Handle missing/wrongly filled values of the selected variables
 As in real world data with user input, the data is incomplete, with missing values, and has incorrect responses. There is no general rule for dealing with these problems beyond “use common sense.” In whatever case, explain what the problems were and how you addressed them. Be sure to explain your rationale for your chosen methods of handling issues with the data. Do not use Excel for this, however tempting it might be.
-``` {r}
-radio <- radio %>% drop_na(sirius) %>% drop_na(worktime) #drop any rows missing sirius/wharton listenership, since this is what we care about most
+``` {r c1 drop na}
+radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since this is what we care about most
 ```
 Tip: Reflect on the reasons for which data could be wrong or missing. How would you address each case? For this homework, if you are trying to predict missing values with regression, you are definitely overthinking. Keep it simple.
 
-``` {r c1}
-parse_number(radio$age) #find variables in age with no numerical values
+``` {r c1 missing&incorrect}
+parse_number(radio$age) #find variables in age with no numerical component
 radio <- radio %>% mutate(age = na_if(age, "female")) %>% mutate(age = parse_number(age)) #replace identified chr variables with NA and recover entries with chr & int data
 
-#now that age is numeric, find min/max and drop data outside reasonable age range:
+#now that age is numeric, find min/max and drop data outside reasonable age range (must be 18+ to work for mturk):
 radio %>% summarise(min=min(age, na.rm=T), max=max(age, na.rm=T))
+is.na(radio$age) <- which(radio$age < 18 | radio$age >110)
+
+#converting categorical data to factors:
+radio <- radio %>% mutate(gender = as.factor(gender),
+          education = as.factor(education),
+          income = as.factor(income),
+          sirius = as.factor(sirius),
+          wharton = as.factor(wharton))
+#listing unique levels to make sure all make sense - need to reorder income & education?
+radio %>% sapply(levels)
+
+#clean up education
+is.na(radio$education) <- which(radio$education == "select one") #replace unselected education values with NA
+radio$education <-droplevels(radio$education) #drop the now unused "select one" level
+radio$education<- factor(radio$education, levels=c("Less than 12 years; no high school diploma", "High school graduate (or equivalent)", "Some college, no diploma; or Associate’s degree", "Bachelor’s degree or other 4-year degree", "Graduate or professional degree", "Other"))
+
+#reordrer income levels
+radio$income<- factor(radio$income, levels=c("Less than $15,000", "$15,000 - $30,000", "$30,000 - $50,000", "$50,000 - $75,000", "$75,000 - $150,000", "Above $150,000"))
+
+#look at worktime - automatically calculated by site and all seem to make sense, no corrections needed
+sum(is.na(radio$worktime))
+radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean=mean(worktime))
 ```
-```{r}
-sum(is.na(radio))
-```
+
 iii. Brief summary 
 
 Write a brief report to summarize all the variables collected. Include both summary statistics (including sample size) and graphical displays such as histograms or bar charts where appropriate. Comment on what you have found from this sample. (For example - it's very interesting to think about why would one work for a job that pays only 10cents/each survey? Who are those survey workers? The answer may be interesting even if it may not directly relate to our goal.)
-``` {r}
-levels(radio$education)
+``` {r completion}
+n <- nrow(radio) #sample size
+(sum(!complete.cases(radio))/n)*100 #percent of subj missing one or more responses
+
+slisten <- sum(radio$sirius == "Yes") #num subj who listen to sirius xm
+wlisten <- sum(radio$wharton == "Yes") #num subj who listen to wharton radio
+
+(wlisten/n)*100 #percent subj who listen to wharton
+(wlisten/slisten)*100 #percent subj listening to sirius who listen to wharton
 ```
+``` {r education}
+d<- ggplot(radio, aes(x=education)) + geom_bar(stat="count") #should i drop NA before plotting?
+d
+```
+
 ## Sample properties
 
 The population from which the sample is drawn determines where the results of our analysis can be applied or generalized. We include some basic demographic information for the purpose of identifying sample bias, if any exists. Combine our data and the general population distribution in age, gender and income to try to characterize our sample on hand.
