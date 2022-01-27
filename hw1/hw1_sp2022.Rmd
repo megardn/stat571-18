@@ -236,9 +236,12 @@ agg <- w_df %>%
     )
 
 # nicer html table
-kbl(agg) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+# kbl(agg) %>%
+#   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 
+kbl(agg) %>%
+  kable_paper() %>%
+    scroll_box(height = "300px")
 ```
 
 ### Plots by field and gender
@@ -290,7 +293,7 @@ Based on the above evidence, it appears that the number of men in `Science field
 
 An additional observation is that the number of students in `Non-S&E` fields overall is much larger than in `Science fields`. To further improve the visualization of gender proportions, we created a graph displaying the propotions of each gender (rather than total number) in different fields.
 
-```{r plotting proportions, echo=FALSE}
+```{r plotting proportions, echo=FALSE, message=FALSE, warning=FALSE}
 
 # getting total number of degrees per field type
 w_df %>% group_by(Field_type, Sex) %>%
@@ -299,8 +302,8 @@ w_df %>% group_by(Field_type, Sex) %>%
   ggplot(aes(x = Field_type, y = total_number, fill = Sex, colour = Sex)) + 
     geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
     theme_bw() +
-    labs(x="Fields of study", y = "Total number") +
-    ggtitle("Number of awarded degrees by field type and gender") +
+    labs(x="Fields of study", y = "Proportion") +
+    ggtitle("Proportion of awarded degrees by sex and field of study") +
     theme(plot.title = element_text(face="bold", size = 15)) +
     theme(legend.text = element_text(size = 10), 
           legend.title = element_text(size = 15),
@@ -312,12 +315,12 @@ w_df %>% group_by(Field_type, Sex) %>%
 # getting total number of degrees per field 
 w_df %>% group_by(Field, Sex) %>%
   summarise(total_number = sum(Number)) %>%
-  # bar plots per gender and field type (while sorting data by max number in males per field)
-  ggplot(aes(x = Field, y = total_number, fill = Sex, colour = Sex)) + 
+  arrange(desc(total_number))  %>%
+  ggplot(aes(x = fct_reorder(Field, total_number), y = total_number, fill = Sex, colour = Sex)) + 
     geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
     theme_bw() +
-    labs(x="Fields of study", y = "Total number") +
-    ggtitle("Number of awarded degrees by field type and gender") +
+    labs(x="Fields of study", y = "Proportion") +
+    ggtitle("Proportion of awarded degrees by sex and field type") +
     theme(plot.title = element_text(face="bold", size = 15)) +
     theme(legend.text = element_text(size = 10), 
           legend.title = element_text(size = 15),
@@ -328,7 +331,9 @@ w_df %>% group_by(Field, Sex) %>%
 
 ```
   
-These plots confirm that the proportion of females is higher in `Non-S&E` fields, but is roughly 50% in `Science fields`. When considering science subfields, computer science and engineering seem to have a clear larger proportion of males. Thus, when considering all science fields together, there is no evidence of a larger pproportion of males. yet when considering by subfields there are striking differences in gender proportions.  
+These plots confirm that the proportion of females is higher in `Non-S&E` fields, but is roughly 50% in `Science fields`. When considering science subfields, `Computer Sciences`, `Engineering`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` seem to have a clear larger proportion of males. Thus, when considering all science fields together, there is no evidence of a larger pproportion of males. yet when considering by subfields there are striking differences in gender proportions.  
+
+
 
 
 ## EDA bringing type of degree, field and gender in 2015
@@ -356,7 +361,7 @@ w_df %>%
 ```
 
   
-In 2015, the number of awarded bachelor degrees is larger overall in comparison to master and PhD degrees. Gender proportions are mostly similar in different degree types for a given subfield. However, some striking exceptions are `Engineering`, for wich the number of males is much higher at the PhD level, as well as `Psychology`, which has a higher number of women at the PhD level.
+In 2015, the number of awarded bachelor degrees is larger overall in comparison to master and PhD degrees. Gender proportions are mostly similar in different degree types for a given subfield. However, some striking exceptions in this plot are `Engineering` and `Physical Sciences`, for which the number of males is much higher at the PhD level, as well as `Psychology`, which has a higher number of women at the PhD level.
 
 
 
@@ -367,19 +372,24 @@ In this last portion of the EDA, we ask you to provide evidence numerically and 
 ### Summary statistics by field, gender and time
 
 ```{r summary statistics for field, gender and time, echo=FALSE, message=FALSE, warning=FALSE, results="hold"}
-# probably better to make some kind of a difference measure or cumulative measure
+
 # summarizing by field and sex
 agg <- w_df %>% 
   group_by(Field, Sex, Year) %>% 
   summarise(
-    Total_Number = sum(Number)
+    "Total number" = sum(Number)
     )
 
 # nicer html table
 kbl(agg) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kable_paper() %>%
+    scroll_box(height = "300px")
+
+# probably better to make some kind of a difference measure or cumulative measure to represent changes across years
 
 ```
+  
+### Plots by field, gender and time
 
 ```{r, echo=FALSE, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
 w_df %>% group_by(Field_type, Sex, Year, Degree) %>%
@@ -387,10 +397,9 @@ w_df %>% group_by(Field_type, Sex, Year, Degree) %>%
   ggplot(aes(x = Year, y = total_number, fill = Sex)) +
   geom_bar(stat = "identity", position = "fill") +
   facet_grid(Degree ~ Field_type, scales = "free_y") +
-  ggtitle("Degrees granted proportion by sex across degree and SE") +
   theme_bw() +
-  labs(x="Fields of study", y = "Total number") +
-  ggtitle("Number of awarded degrees by field type and gender") +
+  labs(x="Fields of study", y = "Proportion") +
+  ggtitle("Proportion of awarded degrees by sex and field type") +
   theme(plot.title = element_text(face="bold", size = 15)) +
   theme(legend.text = element_text(size = 10), 
         legend.title = element_text(size = 15),
@@ -403,10 +412,9 @@ w_df %>% group_by(Field, Sex, Year, Degree) %>%
   ggplot(aes(x = Year, y = total_number, fill = Sex)) +
   geom_bar(stat = "identity", position = "fill") +
   facet_grid(Degree ~ Field, scales = "free_x") +
-  ggtitle("Degrees granted proportion by sex across degree and SE") +
+  ggtitle("Proportion of awarded degrees by sex and field of study") +
   theme_bw() +
-  labs(x="Time", y = "Total number") +
-  ggtitle("Number of awarded degrees by field type and gender") +
+  labs(x="Time", y = "Proportion") +
   theme(plot.title = element_text(face="bold", size = 15)) +
   theme(legend.text = element_text(size = 10), 
         legend.title = element_text(size = 15),
@@ -419,16 +427,43 @@ w_df %>% group_by(Field, Sex, Year, Degree) %>%
 ```
 
 
-Based on the above, we can observe that gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields.  
-
+This graph again highlights the markedly higher proportion of men in `Engineering`, `Computer Sciences`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` and the higher proportion of women in `Psychology`, `Non-S&E` and `Biological Sciences`. Moreover, gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields. 
 
 ## Women in Data Science
 
 Finally, is there evidence showing that women are underrepresented in data science? Data science is an interdisciplinary field of computer science, math, and statistics. You may include year and/or degree.
 
+```{r plotting data science fields, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+w_df %>% group_by(Field, Sex, Year, Degree) %>%
+  filter(Field %in% c("Computer sciences", "Mathematics and statistics")) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field, scales = "free_x") +
+  ggtitle("Proportion of awarded degrees by sex in data science") +
+  theme_bw() +
+  labs(x="Time", y = "Proportion") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10)) +
+  theme(panel.spacing.x = unit(1, "mm"))
+
+```
+  
+This graph provides clear evidence for an underrepresentation of women in data science, as `Computer Sciences` only comprises around 25% of women across all degree types (BS, MS, PhD), and `Mathematics and Statistics` comprises around 50-60% women, with a neat decrease in female representation at the PhD level (~25% women).
+
+
 ## Final brief report
 
 Summarize your findings focusing on answering the questions regarding if we see consistent patterns that more males pursue science-related fields. Any concerns with the data set? How could we improve on the study?
+  
+When considering all science fields together, the proportion of males and females engaging in science related fields appears similar and has remained balanced from 2006-2016. However, when considering gender proportions in subfields of science, we notice a remarkable variation. Specifically, while a number of subfields appear balanced (`Agricultural sciences`, `Social Sciences`), certain subfields contain a strikingly larger proportion of women (`Psychology`, `Biological Sciences`) or men (`Computer Sciences`, `Engineering`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences`) respectively. Finally, these gender proportions remained stable across the considered 10 year period (2006-2016). 
+
+To further improve on the study, it would be interesting to investigate gender proportions among subfields within the `Non-S$E` category. Given that large discrepancies in gender proportions were found when studying science subfields even though the overall gender propotion seemed balanced, it is possible that gender proportions in subfields of `Non-S&E` also might vary a lot compared to the overall proportion reported in this dataset. It would also be interesting to collect this type of data in more recent years to determine whether the trends are now changing or still remain stable. Finally, another avenue to explore would be gender distributions across professions and type of function several years after graduation.
 
 ## Appendix
 
@@ -436,7 +471,7 @@ To help out, we have included some R-codes here as references. You should make y
 
 1. Clean data
 
-```{r data wrangling, echo = FALSE, warning = FALSE}
+```{r data wrangling, echo = FALSE, warning = FALSE, eval=FALSE}
 # For the demonstration purpose, we show this R-chunk by taking echo=TRUE
 # In your final report you should hide all the R-chunks to keep your report flowing well.
 wsci <- read_excel("data/WomenData_06_16.xlsx")
@@ -451,7 +486,7 @@ head(wsci)
 ```
 
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, eval=FALSE}
 wsci %<>%
   rename(Field = "Field and sex",
          Number = "Degrees Awarded") %>%
