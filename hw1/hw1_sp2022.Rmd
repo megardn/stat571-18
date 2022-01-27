@@ -161,9 +161,19 @@ Our goal is to answer the above questions only through EDA (Exploratory Data Ana
 
 Notice the data came in as an Excel file. We need to use the package `readxl` and the function `read_excel()` to read the data `WomenData_06_16.xlsx` into R. 
 
+### Read the data into R
 
-i. Read the data into R.
-ii. Clean the names of each variables. (Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number` )
+```{r load data, echo=FALSE}
+
+w_df <- read_excel("")
+
+```
+
+### Clean the names of each variables. 
+
+(Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number` )
+
+
 iii. Set the variable natures properly. 
 iv. Any missing values?
 
