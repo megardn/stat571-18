@@ -6,10 +6,6 @@ author:
 - Group Member 3
 date: 'Due: 11:59PM,  Jan. 30th, 2021'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: show
     highlight: haddock
@@ -18,6 +14,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2)
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, kableExtra)
 ```
 
 
@@ -161,41 +161,266 @@ Our goal is to answer the above questions only through EDA (Exploratory Data Ana
 
 Notice the data came in as an Excel file. We need to use the package `readxl` and the function `read_excel()` to read the data `WomenData_06_16.xlsx` into R. 
 
-### Read the data into R
 
-```{r load data, echo=FALSE}
 
-w_df <- read_excel("")
+```{r load data, echo=FALSE, include=FALSE}
+# i. Read the data into R
+w_df <- read_excel("data/WomenData_06_16.xlsx")
+
+# ii. Clean the names of each variables. 
+# Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number`. 
+w_df <- w_df %>% rename("Field" = "Field and sex",
+                        "Number" = "Degrees Awarded")
+
+# iii. Set the variable natures properly
+str(w_df)
+
+# renaming a field name to shorter name
+w_df[w_df$Field == "Earth, atmospheric, and ocean sciences", "Field"] <- "Environmental sciences"
+
+# Changing categorical variables from character to factor type
+w_df %<>% mutate(Field = as.factor(Field),
+         Degree = as.factor(Degree),
+         Sex = as.factor(Sex))
+
+# iv. Any missing values?
+summary(w_df)
+# no missing values. 
+
+# count the number of fields
+length(unique(w_df$Field))
+
+# count the number of degrees
+length(unique(w_df$Degree))
+
+# count the number of years reported
+max(w_df$Year) - min(w_df$Year)
 
 ```
 
-### Clean the names of each variables. 
+```{r summary table, echo=FALSE, results='hold'}
+kbl(summary(w_df)) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 
-(Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number` )
 
-
-iii. Set the variable natures properly. 
-iv. Any missing values?
+```
 
 2. Write a summary describing the data set provided here. 
 
 i. How many fields are there in this data?
+
+There are `r length(unique(w_df$Field))` different fields of study in this dataset. 
+
 ii. What are the degree types? 
+
+There are `r length(unique(w_df$Degree))` degree types. 
+
 iii. How many year's statistics are being reported here? 
 
+This dataset is reporting degrees for a duration of `r max(w_df$Year) - min(w_df$Year)` years. 
 
 
 ## BS degrees in 2015
 
 Is there evidence that more males are in science-related fields vs `Non-S&E`? Provide summary statistics and a plot which shows the number of people by gender and by field. Write a brief summary to describe your findings.
 
+### Summary statistics by field and gender
+
+```{r summary statistics, echo=FALSE, message=FALSE, warning=FALSE, results="hold"}
+
+# summarizing by field and sex
+agg <- w_df %>% 
+  group_by(Field, Sex) %>% 
+  summarise(
+    Total_Number = sum(Number)
+    )
+
+# nicer html table
+kbl(agg) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+```
+
+### Plots by field and gender
+
+```{r plotting by gender and field, echo=FALSE, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+# disabling scientific notation for plotting
+options(scipen = 999)
+
+# creating new science vs non-science fields variable
+w_df$Field_type <- ifelse(w_df$Field == "Non-S&E", c("Non-S$E fields"), c("Science fields"))
+
+# getting total number of degrees per field type
+w_df %>% group_by(Field_type, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field type (while sorting data by max number in males per field)
+  ggplot(aes(x = Field_type, y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field type and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10))
+
+
+# getting total number of degrees per field
+w_df %>% group_by(Field, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field (while sorting data by max number in males per field)
+  ggplot(aes(x = forcats::fct_reorder(Field, total_number), y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field of study and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 10))
+
+
+```
+  
+Based on the above evidence, it appears that the number of men in `Science fields` is comparable to the number of women. This constrasts with `Non-S&E` fields, which comprises a much larger number of women. This finding should however be nuanced by the fact that subfields within `Science fields` show very different male/female proportions. For instance, `Biological Sciences` and `Psychology` have a majority of female students, while `Computer sciences` and `Engineering` have a majority of male students.  
+
+An additional observation is that the number of students in `Non-S&E` fields overall is much larger than in `Science fields`. To further improve the visualization of gender proportions, we created a graph displaying the propotions of each gender (rather than total number) in different fields.
+
+```{r plotting proportions, echo=FALSE}
+
+# getting total number of degrees per field type
+w_df %>% group_by(Field_type, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field type (while sorting data by max number in males per field)
+  ggplot(aes(x = Field_type, y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field type and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10))
+
+
+# getting total number of degrees per field 
+w_df %>% group_by(Field, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field type (while sorting data by max number in males per field)
+  ggplot(aes(x = Field, y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field type and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 10))
+
+
+```
+  
+These plots confirm that the proportion of females is higher in `Non-S&E` fields, but is roughly 50% in `Science fields`. When considering science subfields, computer science and engineering seem to have a clear larger proportion of males. Thus, when considering all science fields together, there is no evidence of a larger pproportion of males. yet when considering by subfields there are striking differences in gender proportions.  
+
+
 ## EDA bringing type of degree, field and gender in 2015
 
 Describe the number of people by type of degree, field, and gender. Do you see any evidence of gender effects over different types of degrees? Again, provide graphs to summarize your findings.
 
+```{r plotting field and gender for 2015, echo=FALSE, fig.width=10, fig.height=6}
+
+# creating a plot showing number of awarded degrees by gender (color) for the year 2015
+w_df %>%
+  filter(Year == 2015) %>%
+  ggplot(aes(x = forcats::fct_reorder(Field, Number), y = Number, fill = Sex, colour = Sex)) + 
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+  facet_grid(Degree~., scales = "free_y") +
+  theme_bw() +
+  labs(x="Fields of study") +
+  ggtitle("Number of awarded degrees in 2015 by type of degree, field and gender") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 10))
+
+```
+
+  
+In 2015, the number of awarded bachelor degrees is larger overall in comparison to master and PhD degrees. Gender proportions are mostly similar in different degree types for a given subfield. However, some striking exceptions are `Engineering`, for wich the number of males is much higher at the PhD level, as well as `Psychology`, which has a higher number of women at the PhD level.
+
+
+
 ## EDA bring all variables 
 
 In this last portion of the EDA, we ask you to provide evidence numerically and graphically: Do the number of  degrees change by gender, field, and time? 
+
+### Summary statistics by field, gender and time
+
+```{r summary statistics for field, gender and time, echo=FALSE, message=FALSE, warning=FALSE, results="hold"}
+# probably better to make some kind of a difference measure or cumulative measure
+# summarizing by field and sex
+agg <- w_df %>% 
+  group_by(Field, Sex, Year) %>% 
+  summarise(
+    Total_Number = sum(Number)
+    )
+
+# nicer html table
+kbl(agg) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+```
+
+```{r, echo=FALSE, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+w_df %>% group_by(Field_type, Sex, Year, Degree) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field_type, scales = "free_y") +
+  ggtitle("Degrees granted proportion by sex across degree and SE") +
+  theme_bw() +
+  labs(x="Fields of study", y = "Total number") +
+  ggtitle("Number of awarded degrees by field type and gender") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10))
+
+w_df %>% group_by(Field, Sex, Year, Degree) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field, scales = "free_x") +
+  ggtitle("Degrees granted proportion by sex across degree and SE") +
+  theme_bw() +
+  labs(x="Time", y = "Total number") +
+  ggtitle("Number of awarded degrees by field type and gender") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 5), 
+        axis.text.y = element_text(size = 10)) +
+  scale_x_continuous(breaks = seq(2006, 2016, 10)) +
+  theme(panel.spacing.x = unit(1, "mm"))
+
+```
+
+
+Based on the above, we can observe that gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields.  
+
 
 ## Women in Data Science
 
@@ -214,25 +439,25 @@ To help out, we have included some R-codes here as references. You should make y
 ```{r data wrangling, echo = FALSE, warning = FALSE}
 # For the demonstration purpose, we show this R-chunk by taking echo=TRUE
 # In your final report you should hide all the R-chunks to keep your report flowing well.
-wsci <- read_excel("WomenData_06_16.xlsx")
+wsci <- read_excel("data/WomenData_06_16.xlsx")
 names(wsci)
 head(wsci)
 #change names
-wsci %<>% 
-  rename(Field = 'Field and sex')
-# set the field, degree and sex as factors
-wsci %<>% 
-  mutate( Field = as.factor(Field))
+# wsci %<>% 
+#   rename(Field = 'Field and sex')
+# # set the field, degree and sex as factors
+# wsci %<>% 
+#   mutate( Field = as.factor(Field))
 ```
 
 
 ```{r, echo=FALSE}
-# wsci %<>%
-#   rename(Field = "Field and sex",
-#          Number = "Degrees Awarded") %>%
-#   mutate(Field = as.factor(Field),
-#          Degree = as.factor(Degree),
-#          Sex = as.factor(Sex))
+wsci %<>%
+  rename(Field = "Field and sex",
+         Number = "Degrees Awarded") %>%
+  mutate(Field = as.factor(Field),
+         Degree = as.factor(Degree),
+         Sex = as.factor(Sex))
 
 ```
 
