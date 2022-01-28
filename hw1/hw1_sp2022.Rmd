@@ -113,14 +113,16 @@ sum(is.na(radio))
 
 ii. Handle missing/wrongly filled values of the selected variables
 As in real world data with user input, the data is incomplete, with missing values, and has incorrect responses. There is no general rule for dealing with these problems beyond “use common sense.” In whatever case, explain what the problems were and how you addressed them. Be sure to explain your rationale for your chosen methods of handling issues with the data. Do not use Excel for this, however tempting it might be.
+
 ``` {r c1 drop na}
-radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since this is what we care about most
+radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since that'ss what we care about most
 ```
+
 Tip: Reflect on the reasons for which data could be wrong or missing. How would you address each case? For this homework, if you are trying to predict missing values with regression, you are definitely overthinking. Keep it simple.
 
 ``` {r c1 missing&incorrect}
 parse_number(radio$age) #find variables in age with no numerical component
-radio <- radio %>% mutate(age = na_if(age, "female")) %>% mutate(age = parse_number(age)) #replace identified chr variables with NA and recover entries with chr & int data
+radio <- radio %>% mutate(age = parse_number(age, na="female")) #replace identified chr variables with NA and recover entries with chr & int data
 
 #now that age is numeric, find min/max and drop data outside reasonable age range (must be 18+ to work for mturk):
 radio %>% summarise(min=min(age, na.rm=T), max=max(age, na.rm=T))
@@ -151,19 +153,46 @@ radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean
 iii. Brief summary 
 
 Write a brief report to summarize all the variables collected. Include both summary statistics (including sample size) and graphical displays such as histograms or bar charts where appropriate. Comment on what you have found from this sample. (For example - it's very interesting to think about why would one work for a job that pays only 10cents/each survey? Who are those survey workers? The answer may be interesting even if it may not directly relate to our goal.)
-``` {r completion}
+
+``` {r summary}
+###should i drop na for all variables?
 n <- nrow(radio) #sample size
+n
 (sum(!complete.cases(radio))/n)*100 #percent of subj missing one or more responses
 
+sapply(radio, function(x) sum(!is.na(x))) #sample size for each variable
+sapply(radio, summary) #summary of all data
+```
+
+``` {r siruis}
 slisten <- sum(radio$sirius == "Yes") #num subj who listen to sirius xm
 wlisten <- sum(radio$wharton == "Yes") #num subj who listen to wharton radio
 
 (wlisten/n)*100 #percent subj who listen to wharton
 (wlisten/slisten)*100 #percent subj listening to sirius who listen to wharton
 ```
+
+Plots!
+
+``` {r wharton plot}
+w<- ggplot(radio, aes(x=sirius, fill=wharton)) + geom_bar(stat="count") + scale_fill_brewer(palette="Blues")
+w
+```
+
+
 ``` {r education}
-d<- ggplot(radio, aes(x=education)) + geom_bar(stat="count") #should i drop NA before plotting?
+d<- ggplot(radio) + geom_bar(aes(x=education), stat="count", fill="darkblue") + theme(axis.text.x = element_text(angle = 60, hjust=1)) + ggtitle("Reported education of survey respondents") #should i drop NA before plotting?
 d
+```
+
+``` {r income}
+i<- ggplot(radio, aes(x=income, fill=wharton)) + geom_bar(stat="count")
+i
+```
+
+``` {r age plot}
+a <- ggplot(radio, aes(x=age, y = ..density..)) + geom_histogram(bins=25, color="white", fill= "darkblue" )
+a
 ```
 
 ## Sample properties
