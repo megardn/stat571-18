@@ -1,9 +1,9 @@
 ---
 title: " Modern Data Mining, HW 1"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Joelle Bagautdinova
+- Diego Davila
+- Margaret Gardner
 date: 'Due: 11:59PM,  Jan. 30th, 2021'
 output:
   pdf_document:
@@ -30,78 +30,32 @@ knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2)
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven)
 ```
 
 
 \pagebreak
 
-# Overview
-
-This is a fast-paced course that covers a lot of material. There will be a large amount of references. You may need to do your own research to fill in the gaps in between lectures and homework/projects. It is impossible to learn data science without getting your hands dirty. Please budget your time evenly. Last-minute work ethic will not work for this course. 
-
-Homework in this course is different from your usual homework assignment as a typical student. Most of the time, they are built over real case studies.  While you will be applying methods covered in lectures, you will also find that extra teaching materials appear here.  The focus will be always on the goals of the study, the usefulness of the data gathered, and the limitations in any conclusions you may draw. Always try to challenge your data analysis in a critical way. Frequently, there are no unique solutions.
-
-Case studies in each homework can be listed as your data science projects (e.g. on your CV) where you see fit. 
-
-## Objectives 
-
-- Get familiar with `R-studio` and `RMarkdown`
-- Hands-on R 
-- Learn data science essentials 
-    - gather data
-    - clean data
-    - summarize data 
-    - display data
-    - conclusion
-- Packages
-    - `dplyr`
-    - `ggplot`
-
 ##  Instructions
-
-- **Homework assignments can be done in a group consisting of up to three members**. Please find your group members as soon as possible and register your group on our Canvas site.
-
-- **All work submitted should be completed in the R Markdown format.** You can find a cheat sheet for R Markdown [here](https://github.com/rstudio/cheatsheets/raw/master/rmarkdown-2.0.pdf). For those who have never used it before, we urge you to start this homework as soon as possible. 
 
 - **Submit the following files, one submission for each group:**  (1) Rmd file, (2) a compiled PDF or HTML version, and (3) all necessary data files if different from our source data. You may directly edit this .rmd file to add your answers. If you intend to work on the problems separately within your group, compile your answers into one Rmd file before submitting. We encourage that you at least attempt each problem by yourself before working with your teammates. Additionally, ensure that you can 'knit' or compile your Rmd file. It is also likely that you need to configure Rstudio to properly convert files to PDF. [**These instructions**](http://kbroman.org/knitr_knutshell/pages/latex.html#converting-knitrlatex-to-pdf) might be helpful.
 
 - In general, be as concise as possible while giving a fully complete answer to each question. All necessary datasets are available in this homework folder on Canvas. Make sure to document your code with comments (written on separate lines in a code chunk using a hashtag `#` before the comment) so the teaching fellows can follow along. R Markdown is particularly useful because it follows a 'stream of consciousness' approach: as you write code in a code chunk, make sure to explain what you are doing outside of the chunk. 
 
-- A few good or solicited submissions will be used as sample solutions. When those are released, make sure to compare your answers and understand the solutions.
-
-
-## Review materials
-
-- Study Advanced R Tutorial (to include `dplyr` and `ggplot`)
-- Study lecture 1: Data Acquisition and EDA
-
-
 # Case study 1: Audience Size
-
-How successful is the Wharton Talk Show [Business Radio Powered by the Wharton School](https://businessradio.wharton.upenn.edu/)  
-
-
-**Background:** Have you ever listened to [SiriusXM](https://www.siriusxm.com/)? Do you know there is a **Talk Show** run by Wharton professors in Sirius Radio?  Wharton launched a talk show called [Business Radio Powered by the Wharton School](https://businessradio.wharton.upenn.edu/) through the Sirius Radio station in January of 2014. Within a short period of time the general reaction seemed to be overwhelmingly positive. To find out the audience size for the show, we designed a survey and collected a data set via MTURK in May of 2014. Our goal was to **estimate the audience size**. There were 51.6 million Sirius Radio listeners then. One approach is to estimate the proportion of the Wharton listeners to that of the Sirius listeners, $p$, so that we will come up with an audience size estimate of approximately 51.6 million times $p$. 
-
-To do so, we launched a survey via Amazon Mechanical Turk ([MTurk](https://www.mturk.com/)) on May 24, 2014 at an offered price of \$0.10 for each answered survey.  We set it to be run for 6 days with a target maximum sample size of 2000 as our goal. Most of the observations came in within the first two days. The main questions of interest are "Have you ever listened to Sirius Radio" and "Have you ever listened to Sirius Business Radio by Wharton?". A few demographic features used as control variables were also collected; these include Gender, Age and Household Income.  
-
-We requested that only people in United States answer the questions. Each person can only fill in the questionnaire once to avoid duplicates. Aside from these restrictions, we opened the survey to everyone in MTurk with a hope that the sample would be more randomly chosen. 
-
-The raw data is stored as `Survey_results_final.csv` on Canvas.
 
 ## Data preparation
 
-i. We need to clean and select only the variables of interest. 
-
-``` {r c1 load mturk}
-mturk <- read.csv("data/Survey_results_final.csv", header = TRUE, stringsAsFactors = F, na = "") #read data into df from csv and replacing blanks with NA
-colnames(mturk)
+Loading survey data.
+``` {r c1 load.mturk, echo=FALSE}
+#read data into df from csv and replacing blanks with NA
+mturk <- read.csv("data/Survey_results_final.csv", header = TRUE, stringsAsFactors = F, na = "") 
+#colnames(mturk)
 ```
 
-Select only the variables Age, Gender, Education Level, Household Income in 2013, Sirius Listener?, Wharton Listener? and Time used to finish the survey.Change the variable names to be "age", "gender", "education", "income", "sirius", "wharton", "worktime".
+i. Selecting and renaming only specified variables of interest for clarity.
 
-``` {r c1 filt & rename}
+``` {r filt&rename, echo=FALSE}
 #write new df filtered to desired columns and rename column headers
 radio <- mturk %>% select(Answer.Age, Answer.Gender, Answer.Education, Answer.HouseHoldIncome, Answer.Sirius.Radio, Answer.Wharton.Radio, WorkTimeInSeconds) %>% rename(age = Answer.Age, gender = Answer.Gender, education = Answer.Education, income = Answer.HouseHoldIncome, sirius = Answer.Sirius.Radio, wharton = Answer.Wharton.Radio, worktime = WorkTimeInSeconds)
 
@@ -111,40 +65,55 @@ str(radio)
 sum(is.na(radio))
 ```
 
-ii. Handle missing/wrongly filled values of the selected variables
-As in real world data with user input, the data is incomplete, with missing values, and has incorrect responses. There is no general rule for dealing with these problems beyond “use common sense.” In whatever case, explain what the problems were and how you addressed them. Be sure to explain your rationale for your chosen methods of handling issues with the data. Do not use Excel for this, however tempting it might be.
+ii. Handling missing/wrongly filled values of the selected variables
 
-``` {r c1 drop na}
-radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since that'ss what we care about most
+Generally, data may be wrong or incorrect if participants were confused by the instructions or inattentive to the survey.
+
+Dropping any respondents who are missing answers for listening to Sirius Radio or Wharton radio, since this data won't be usable for our analyses.
+
+``` {r c1 drop.na}
+radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since that's what we care about most
 ```
 
-Tip: Reflect on the reasons for which data could be wrong or missing. How would you address each case? For this homework, if you are trying to predict missing values with regression, you are definitely overthinking. Keep it simple.
+Cleaning age data to ensure data is a continuous numerical. Dropping any datapoints outside the range of 18 to 110 years which are likely erroneous; MTurk requires that workers be at least 18 years old and age above 110 is rare.
+``` {r age.correct}
+#find variables in age with no numerical component
+parse_number(radio$age) 
 
-``` {r c1 missing&incorrect}
-parse_number(radio$age) #find variables in age with no numerical component
-radio <- radio %>% mutate(age = parse_number(age, na="female")) #replace identified chr variables with NA and recover entries with chr & int data
+#replace chr variables identified above with NA and recover entries with both chr & int data via parse_number()
+radio <- radio %>% mutate(age = parse_number(age, na="female")) 
 
 #now that age is numeric, find min/max and drop data outside reasonable age range (must be 18+ to work for mturk):
 radio %>% summarise(min=min(age, na.rm=T), max=max(age, na.rm=T))
 is.na(radio$age) <- which(radio$age < 18 | radio$age >110)
+```
 
+
+Cleaning categorical variables by marking as factors and ordering levels as appropriate for inherently ranked categories (i.e. education, income)
+```{r factor.correct}
 #converting categorical data to factors:
 radio <- radio %>% mutate(gender = as.factor(gender),
           education = as.factor(education),
           income = as.factor(income),
           sirius = as.factor(sirius),
           wharton = as.factor(wharton))
-#listing unique levels to make sure all make sense - need to reorder income & education?
+#listing unique levels to make sure all make sense
 radio %>% sapply(levels)
 
-#clean up education
-is.na(radio$education) <- which(radio$education == "select one") #replace unselected education values with NA
-radio$education <-droplevels(radio$education) #drop the now unused "select one" level
+#clean up education:
+  #replace unselected education values with NA
+is.na(radio$education) <- which(radio$education == "select one") 
+  #drop the now unused "select one" level
+radio$education <-droplevels(radio$education) 
+  #reorder
 radio$education<- factor(radio$education, levels=c("Less than 12 years; no high school diploma", "High school graduate (or equivalent)", "Some college, no diploma; or Associate’s degree", "Bachelor’s degree or other 4-year degree", "Graduate or professional degree", "Other"))
 
 #reordrer income levels
 radio$income<- factor(radio$income, levels=c("Less than $15,000", "$15,000 - $30,000", "$30,000 - $50,000", "$50,000 - $75,000", "$75,000 - $150,000", "Above $150,000"))
+```
 
+Check worktime variable to ensure data is reasonable, no changes needed.
+``` {r worktime.correct}
 #look at worktime - automatically calculated by site and all seem to make sense, no corrections needed
 sum(is.na(radio$worktime))
 radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean=mean(worktime))
@@ -152,47 +121,45 @@ radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean
 
 iii. Brief summary 
 
+###should i drop na for all variables?
+
 Write a brief report to summarize all the variables collected. Include both summary statistics (including sample size) and graphical displays such as histograms or bar charts where appropriate. Comment on what you have found from this sample. (For example - it's very interesting to think about why would one work for a job that pays only 10cents/each survey? Who are those survey workers? The answer may be interesting even if it may not directly relate to our goal.)
 
-``` {r summary}
-###should i drop na for all variables?
-n <- nrow(radio) #sample size
-n
-(sum(!complete.cases(radio))/n)*100 #percent of subj missing one or more responses
+Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!complete.cases(radio))/n)*100`% of subject's data was incomplete (i.e. missing one or more demographic variables). Number of responses for each variable and final summary of data below:
 
-sapply(radio, function(x) sum(!is.na(x))) #sample size for each variable
-sapply(radio, summary) #summary of all data
-```
-
-``` {r siruis}
-slisten <- sum(radio$sirius == "Yes") #num subj who listen to sirius xm
-wlisten <- sum(radio$wharton == "Yes") #num subj who listen to wharton radio
-
-(wlisten/n)*100 #percent subj who listen to wharton
-(wlisten/slisten)*100 #percent subj listening to sirius who listen to wharton
+``` {r summary, echo=FALSE}
+#sample size for each variable
+sapply(radio, function(x) sum(!is.na(x))) 
+#summary of all data
+sapply(radio, summary) 
 ```
 
 Plots!
 
-``` {r wharton plot}
+``` {r wharton.plot}
 w<- ggplot(radio, aes(x=sirius, fill=wharton)) + geom_bar(stat="count") + scale_fill_brewer(palette="Blues")
 w
 ```
 
 
-``` {r education}
+``` {r education.plot}
 d<- ggplot(radio) + geom_bar(aes(x=education), stat="count", fill="darkblue") + theme(axis.text.x = element_text(angle = 60, hjust=1)) + ggtitle("Reported education of survey respondents") #should i drop NA before plotting?
 d
 ```
 
-``` {r income}
+``` {r income.plot}
 i<- ggplot(radio, aes(x=income, fill=wharton)) + geom_bar(stat="count")
 i
 ```
 
-``` {r age plot}
+``` {r age.plot}
 a <- ggplot(radio, aes(x=age, y = ..density..)) + geom_histogram(bins=25, color="white", fill= "darkblue" )
 a
+```
+
+``` {r worktime.plot}
+t <- ggplot(radio, aes(x=worktime, y = ..density..)) + geom_histogram(bins=25, color="white", fill= "darkgreen" )
+t
 ```
 
 ## Sample properties
@@ -204,16 +171,35 @@ ii. Does this sample appear to be a random sample from the MTURK population?
 
 Note: You can not provide evidence by simply looking at our data here. For example, you need to find distribution of education in our age group in US to see if the two groups match in distribution. You may need to gather some background information about the MTURK population to have a slight sense if this particular sample seem to a random sample from there... Please do not spend too much time gathering evidence. 
 
+### Comparison to General Population
+Data describing the demographics of the US general population was obtained from the 2014 American Community Survey, data available from the US Census Bureau [here](https://data.census.gov/cedsci/). 
+
+
+### Comparison to MTURK Population
+Data describing the demographics of MTURK workers in the US is from Moss et al and obtained [here](https://osf.io/w7e8p/?view_only=37f51a62db6144a2950646975887bac9). Data was collected in 2019.
+
+scales are different....
+
+``` {r}
+mpop <- as.data.frame(read_sav("data/MTurkEthics_Study1_Data.sav")) #load mturk data
+#names(mpop)
+mpop <- mpop %>% select(age, Whatisyourgender, Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) %>% rename(gender=Whatisyourgender, education=Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, income=Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) #subset and rename columns
+mpop
+```
+
 ## Final estimate
 
-Give a final estimate of the Wharton audience size in January 2014. Assume that the sample is a random sample of the MTURK population, and that the proportion of Wharton listeners vs. Sirius listeners in the general population is the same as that in the MTURK population. Write a brief executive summary to summarize your findings and how you came to that conclusion.
+``` {r siruis, echo=FALSE}
+#estimating listenership 
+slisten <- sum(radio$sirius == "Yes") #num subj who listen to sirius xm
+wlisten <- sum(radio$wharton == "Yes") #num subj who listen to wharton radio
+p <- (wlisten/slisten) #proportion sirius listeners who listen to wharton
+p*100 #percent subj listening to sirius who listen to wharton
+```
 
-To be specific, you should include:
+The Wharton radio listenership comprised of approximately ***`r prettyNum(p*51.6*100000, big.mark = ",")` individuals*** in January 2014, assuming that the study sample's reported listening habits are representative of the general population.
 
-1. Goal of the study
-2. Method used: data gathering, estimation methods
-3. Findings
-4. Limitations of the study. 
+The aim of the present study was to estimate the audience size of radio show Business Radio Powered by the Wharton School (Wharton Radio), available on Sirius Radio. Audience size was estimated by assessing the proportion of Sirius Radio listeners who reported listening to the Wharton talk show. Data was collected via survey on Amazon's Mechanical Turk (MTurk) platform in May 2014. Of `r n` survey respondents, `r prettyNum(wlisten, big.mark = ",")` of  `r prettyNum(slisten, big.mark = ",")` Sirius Radio listeners reported listening to Wharton radio. This ratio was extrapolated to the approximately 51.6 million Sirius listeners in 2014, resulting in an estimated `r prettyNum(p*51.6*100000, big.mark = ",")` listeners to Wharton radio. This finding is limited by sampling methodology, which was restricted to individuals enrolled in MTurk and may not be representative of Sirius Radio listeners. 
 
 
 ## New task
