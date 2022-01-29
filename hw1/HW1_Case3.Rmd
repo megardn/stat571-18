@@ -3,13 +3,11 @@ title: "STAT571 HW1 Group 18 - Case 3"
 output: html_notebook
 ---
 
-
-Case 3: MLB
+# Case 3: MLB
 
 ## Setup & Imports
 ```{r}
-knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4) # do formatting for eventual knitted output
-options(scipen = 0, digits = 3)  # controls base R output
+knitr::opts_chunk$set(fig.width=10, fig.height=6) # do formatting for eventual knitted output
 if(!require('pacman')) {install.packages('pacman')} # if you don't have pacman, install it
 pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2) # load necessary packages
 ```
@@ -28,25 +26,23 @@ First, we create a new variable called diff_lag, which describes the log differe
 In this setup, it is more appropriate to work with log-transformed data because it is more informative about *relative* differences than the raw amount of payroll increase. In other words, the same amount of raw change in payroll would represent a more significant increase to a team earning less, than a team earning more, so we can take the differences of the log values to address this. 
 ```{r}
 baseball$diff_log <-  log(baseball$payroll) - log(lag(baseball$payroll)) #here we create the new variable of differences of log values
-baseball$diff_win_pct <-  baseball$win_pct - lag(baseball$win_pct) # I'm also going to create a variable that describes the change in win_pct, which will help in 4.2 
+baseball$diff_win_pct <-  baseball$win_pct - lag(baseball$win_pct) # I'm also going to create a variable that describes the change in win_pct, which will be useful in 4.2 and later sections
 
-# now, we create a new table with variables of interest: team, year, diff_log, and win_pct
+# now, we create a new table with our variables of interest
 baseball_variables <- baseball %>% 
   select(team, year, diff_log, payroll, win_pct, diff_win_pct) %>%
   na.omit # Because the first year in our data will not have a computable difference from the previous year, it will produce an NA in the diff_log column. This particular row will not contain information relevant to our analysis, so we can simply omit the rows that have NAs. 
 
-
 head(baseball_variables, 5) # let's take a look to make sure we've got what we need
 ```
 
-## 4.2
+## 4.2 Exploratory questions
 ```{r}
-
 # for convenience, create a table with just the years 2010-2014
 baseball_variables_2010_2014 <- baseball_variables %>%
   subset(year >= 2010 & year <= 2014) # we're only interested in the years between 2010 and 2014 inclusive
 
-# sum up each team's change in payroll over the years. Here I also do the same for the chang ein win percentage, as this will aid our subsequent comparison. 
+# sum up each team's change in payroll over the years. Here I also do the same for the change in win percentage, as this will aid our subsequent comparison. 
 baseball_variables_2010_2014 <- aggregate(cbind(diff_log,diff_win_pct ) ~ team, data = baseball_variables_2010_2014, FUN = sum)
 
 # now, let's see which 5 teams had the largest increase in payroll between 2010 and 2014
@@ -58,7 +54,6 @@ baseball_variables_2010_2014 %>%
 baseball_variables_2010_2014 %>%
   arrange(desc(diff_win_pct)) %>% 
   head(5)
-
 ```
 As we can see in the procedure above, the top 5 teams with the highest *payroll* increase between 2010 and 2014 are:
 1. Los Angeles Dodgers
@@ -74,34 +69,34 @@ And the top 5 teams with the highest win percentage increase between 2010 and 20
 4. Kansas City Royals
 5. Cleveland Indians
 
-## 4.3
+## 4.3 Do log increases in payroll imply better performance?
 ```{r}
-
 cor(baseball_variables$diff_log, baseball_variables$diff_win_pct, method = 'pearson') # check the correlation between the two variables of interest (diff_log and change in win_pct)
 
-# fit a linear model to see if diff_log predicts diff_win_pct
+# run a linear model to evaluate the regression of diff_log on change in win percentage 
 baseball_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables)
 summary(baseball_model) # lm output
 
 # ok, let's plot the lm 
-ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point() + stat_smooth(method = "lm", col = "red")
-
+ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point(col = "steelblue4") + stat_smooth(method = "lm", col = "red3") + ggtitle("Linear Model | ∆Win Percentage ~ ∆Log Payroll | p=0.0427, Adj. R^2=0.00612") + xlab("∆Log Payroll") + ylab("∆Win Percentage")
 ```
 It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance. 
 
-## 4.4
+## 4.4 Comparison
 ```{r}
-baseball_model_2 <- lm(diff_win_pct ~ payroll, data = baseball_variables)
+baseball_model_2 <- lm(diff_win_pct ~ payroll, data = baseball_variables) # run a lm with payroll as the predictor variable
 summary(baseball_model_2) # lm output
-
-baseball_model_complete <- lm(diff_win_pct ~ diff_log + payroll, data = baseball_variables)
-summary(baseball_model_complete) # lm output
-
 ```
 
-It appears that between change in log payroll, and payroll as such, the change in log payroll is more predictive of change in performance. 
-It should be noted that, if we create a linear model that combines both payroll as such, and change in log payroll, it better predicts change in performance than either variable alone. 
+In order to make this comparison, the criteria I will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. 
 
+As we can see, the linear model using change in log payroll yields an Adjusted R-Squared of 0.00612, and is statistically significant at p = 0.0427. On the other hand, the linear model using payroll as such yields an Adjusted R-Squared of 0.00457 and is not statistically significant, with p = 0.0685.
 
+Thus, based on these criteria, it appears that between change in log payroll, and payroll as such, the change in log payroll is more predictive of change in performance. 
 
+It should be noted that, if we run a multiple regression that combines both payroll as such, and change in log payroll, as predictive variables, it better predicts change in performance than either variable alone, with an adjusted R^2 of 0.0161 and p = 0.00606, as can be observed below. 
+```{r}
+baseball_model_complete <- lm(diff_win_pct ~ diff_log + payroll, data = baseball_variables)
+summary(baseball_model_complete) # lm output
+```
 
