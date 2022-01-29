@@ -1,6 +1,8 @@
 ---
 title: "STAT571 HW1 Group 18 - Case 3"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 # Case 3: MLB
@@ -40,7 +42,7 @@ head(baseball_variables, 5) # let's take a look to make sure we've got what we n
 
 ## 4.2 Exploratory questions
 ```{r}
-# to answer these questions, let's create a new data.frame that contains each team, their corresponding log chang ein payroll between 2010 and 2014, and their corresponding change in win percentage between those same years
+# to answer these questions, let's create a new data.frame that contains each team, their corresponding log change in payroll between 2010 and 2014, and their corresponding change in win percentage between those same years
 baseball_variables_2010_2014 <- data.frame(unique(baseball_variables$team), 
                                            log(baseball_variables$payroll[baseball_variables$year == 2014]) - log(baseball_variables$payroll[baseball_variables$year == 2010]),
                                            baseball_variables$win_pct[baseball_variables$year == 2014] - baseball_variables$win_pct[baseball_variables$year == 2010]) 
@@ -235,7 +237,5 @@ Based on the p-value and Adjusted R-Squared of our analyses:
 4. Change in log payroll robustly predicts performance as such for 2 teams.
 
 As we can see, it seems that change in log payroll better predicts change in win percentage, while payroll as such better predicts win percentage as such. So, the predictor variable we should use will depend on how we define "explaining performance". 
-
-
 
 
