@@ -69,10 +69,13 @@ ii. Handling missing/wrongly filled values of the selected variables
 
 Generally, data may be wrong or incorrect if participants were confused by the instructions or inattentive to the survey.
 
-Dropping any respondents who are missing answers for listening to Sirius Radio or Wharton radio, since this data won't be usable for our analyses.
+Dropping any respondents who are missing answers for listening to Sirius Radio or Wharton radio, since this data won't be usable for our analyses. Further, any subjects who reported listening to the Wharton radio show but not to Sirius Radio were excluded on the basis of input error.
 
-``` {r c1 drop.na}
+``` {r sirius.correct}
 radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since that's what we care about most
+
+#remove nonsense subjects
+radio[!(radio$sirius == "No" & radio$wharton == "Yes"),]
 ```
 
 Cleaning age data to ensure data is a continuous numerical. Dropping any datapoints outside the range of 18 to 110 years which are likely erroneous; MTurk requires that workers be at least 18 years old and age above 110 is rare.
@@ -83,7 +86,7 @@ parse_number(radio$age)
 #replace chr variables identified above with NA and recover entries with both chr & int data via parse_number()
 radio <- radio %>% mutate(age = parse_number(age, na="female")) 
 
-#now that age is numeric, find min/max and drop data outside reasonable age range (must be 18+ to work for mturk):
+#now that age is numeric, drop data outside reasonable age range (must be 18+ to work for mturk):
 radio %>% summarise(min=min(age, na.rm=T), max=max(age, na.rm=T))
 is.na(radio$age) <- which(radio$age < 18 | radio$age >110)
 ```
@@ -121,44 +124,77 @@ radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean
 
 iii. Brief summary 
 
-###should i drop na for all variables?
+Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!complete.cases(radio))/n)*100`% of subject's data was incomplete (i.e. missing one or more demographic variables). The number of usable responses for each variable is shown below:
 
-Write a brief report to summarize all the variables collected. Include both summary statistics (including sample size) and graphical displays such as histograms or bar charts where appropriate. Comment on what you have found from this sample. (For example - it's very interesting to think about why would one work for a job that pays only 10cents/each survey? Who are those survey workers? The answer may be interesting even if it may not directly relate to our goal.)
-
-Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!complete.cases(radio))/n)*100`% of subject's data was incomplete (i.e. missing one or more demographic variables). Number of responses for each variable and final summary of data below:
-
-``` {r summary, echo=FALSE}
+``` {r summary1, echo=FALSE}
 #sample size for each variable
 sapply(radio, function(x) sum(!is.na(x))) 
+```
+
+Data summary for each variable, including number of missing responses, displayed below:
+
+``` {r summary2, echo=FALSE}
 #summary of all data
 sapply(radio, summary) 
 ```
 
 Plots!
 
+
+``` {r age.plot}
+a <- ggplot(radio, aes(x=age)) + 
+  geom_histogram(bins=25, color="white", fill= "darkblue" ) +
+  labs(title="Reported age survey respondents")
+a
+```
+
 ``` {r wharton.plot}
-w<- ggplot(radio, aes(x=sirius, fill=wharton)) + geom_bar(stat="count") + scale_fill_brewer(palette="Blues")
+w<- ggplot(radio, aes(x=sirius, fill=wharton)) + 
+  geom_bar(stat="count") + 
+  scale_fill_brewer(palette="Blues") + 
+  labs(title="Reported listening habits of survey respondents", x="Listen to Sirius Radio") + 
+  guides(fill=guide_legend(title="Listen to Wharton Radio Show")) 
 w
 ```
 
 
 ``` {r education.plot}
-d<- ggplot(radio) + geom_bar(aes(x=education), stat="count", fill="darkblue") + theme(axis.text.x = element_text(angle = 60, hjust=1)) + ggtitle("Reported education of survey respondents") #should i drop NA before plotting?
+d<- ggplot(radio) + 
+  geom_bar(aes(x=education), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  ggtitle("Reported education of survey respondents") #should i drop NA before plotting?
 d
 ```
 
+Reported household income was plotted among those who do and do not listen to Wharton's radio show.
+
 ``` {r income.plot}
-i<- ggplot(radio, aes(x=income, fill=wharton)) + geom_bar(stat="count")
+i<- ggplot(radio, aes(x=income, fill=wharton)) + 
+  geom_bar(stat="count") +
+  labs(title="Reported household income and listenership of survey respondents", x="Annual Household Income") + 
+  guides(fill=guide_legend(title="Listen to Wharton Radio Show")) 
 i
 ```
 
-``` {r age.plot}
-a <- ggplot(radio, aes(x=age, y = ..density..)) + geom_histogram(bins=25, color="white", fill= "darkblue" )
-a
+
+```{r}
+neww <- radio %>% group_by(income, wharton) %>% count(wharton) %>% filter(wharton=="Yes")
+newi <- radio %>% group_by(income) %>% count(income) %>% rename(total=n)
+
+newmerge <- inner_join(neww, newi, by="income") %>% mutate(prcnt=(n/total)*100)
+
+prc<- ggplot(newmerge) + 
+  geom_col(aes(x=income, y=prcnt),fill="darkblue")+
+  labs(title="Percent respondents listening to Wharton radio by household income", x="Annual Household Income", y ="Percent listening to Wharton radio") +
+  ylim(0,100)
+prc
 ```
 
+
 ``` {r worktime.plot}
-t <- ggplot(radio, aes(x=worktime, y = ..density..)) + geom_histogram(bins=25, color="white", fill= "darkgreen" )
+t <- ggplot(radio, aes(x=worktime)) + 
+  geom_histogram(bins=25, color="white", fill= "darkgreen") + 
+  labs(title="Time to survey completion", x = "Worktime (sec)")
 t
 ```
 
@@ -199,7 +235,7 @@ p*100 #percent subj listening to sirius who listen to wharton
 
 The Wharton radio listenership comprised of approximately ***`r prettyNum(p*51.6*100000, big.mark = ",")` individuals*** in January 2014, assuming that the study sample's reported listening habits are representative of the general population.
 
-The aim of the present study was to estimate the audience size of radio show Business Radio Powered by the Wharton School (Wharton Radio), available on Sirius Radio. Audience size was estimated by assessing the proportion of Sirius Radio listeners who reported listening to the Wharton talk show. Data was collected via survey on Amazon's Mechanical Turk (MTurk) platform in May 2014. Of `r n` survey respondents, `r prettyNum(wlisten, big.mark = ",")` of  `r prettyNum(slisten, big.mark = ",")` Sirius Radio listeners reported listening to Wharton radio. This ratio was extrapolated to the approximately 51.6 million Sirius listeners in 2014, resulting in an estimated `r prettyNum(p*51.6*100000, big.mark = ",")` listeners to Wharton radio. This finding is limited by sampling methodology, which was restricted to individuals enrolled in MTurk and may not be representative of Sirius Radio listeners. 
+The aim of the present study was to estimate the audience size of radio show Business Radio Powered by the Wharton School (Wharton Radio), available on Sirius Radio. Audience size was estimated by assessing the proportion of Sirius Radio listeners who reported listening to the Wharton talk show. Data was collected via survey on Amazon's Mechanical Turk (MTurk) platform in May 2014. Of `r n` survey respondents, `r prettyNum(wlisten, big.mark = ",")` of  `r prettyNum(slisten, big.mark = ",")` Sirius Radio listeners reported listening to Wharton radio (`r p*100`%). This ratio was extrapolated to the approximately 51.6 million Sirius listeners in 2014, resulting in an estimated `r prettyNum(p*51.6*100000, big.mark = ",")` listeners to Wharton radio. This finding is limited by sampling methodology, which was restricted to individuals enrolled in MTurk and may not be representative of Sirius Radio listeners. 
 
 
 ## New task
