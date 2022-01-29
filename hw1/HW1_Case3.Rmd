@@ -76,8 +76,6 @@ And the top 5 teams with the highest win percentage increase between 2010 and 20
 
 ## 4.3 Do log increases in payroll imply better performance?
 ```{r}
-cor(baseball_variables$diff_log, baseball_variables$diff_win_pct, method = 'pearson') # check the correlation between the two variables of interest (diff_log and change in win_pct)
-
 # run a linear model to evaluate the regression of diff_log on change in win percentage 
 baseball_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables)
 summary(baseball_model) # lm output
@@ -85,9 +83,47 @@ summary(baseball_model) # lm output
 # ok, let's plot the lm 
 ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point(col = "steelblue4") + stat_smooth(method = "lm", col = "red3") + ggtitle("Linear Model | ∆Win Percentage ~ ∆Log Payroll | p=0.0427, Adj. R^2=0.00612") + xlab("∆Log Payroll") + ylab("∆Win Percentage")
 ```
-To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage as such because this provides a picture of how performance responds to our putative predictor of interest. 
+To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage as such because this provides a picture of how performance responds to our putative predictor of interest. I have chosen a regression over an evaluation of correlation, as we are trying to assess the directed relationship of how change in log payroll affects performance. 
 
 It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance.
+
+We have established that aggregating across all teams, there is a small predictive relationship between change in log payroll and change in performance. However, we can dive deeper and see if this is true for all teams, or just a subset of teams. To do this, I will conduct a regression for each team, evaluating the change in log payroll as a predictor of change in performance. 
+```{r, fig.align = "center", fig.height = 6, fig.width = 6, out.width = "6in"}
+# since we'll be running many linear regressions (one for each team), it's best to initialize empty arrays to contain p-value and effect size (adj. R^2) of each regression
+p_vector <- rep(NA, length(unique(baseball_variables$team))) # initialize p-value vector
+effect_vector <- rep(NA, length(unique(baseball_variables$team))) # initialize effect size vector 
+# while loops can be slow in R, I'll use one here because we don't have that many teams
+for (i in 1:length(unique(baseball_variables$team))){
+  temporary_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables %>% filter(team == unique(baseball_variables$team)[i])) # run the regression, select only the rows that pertain to the team of interest
+  p_vector[i] <- summary(temporary_model)$coefficients["diff_log",4] # extract the p-value 
+  effect_vector[i] <- summary(temporary_model)$adj.r.squared # extract the adjusted R^2
+}
+
+# great! now let's create a data.frame that contains p-value, effect size, and team
+teamwise_regression_result <- data.frame(team = unique(baseball_variables$team), p_value = p_vector, effect_size = effect_vector)
+
+# visualize results
+# create a bar plot showing each team's p-value in their regression
+p_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regression p-value") + theme(legend.position = "none")
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regression Effect Size (Adj. R^2)") + theme(legend.position = "none")
+gridExtra::grid.arrange(p_plot, rsq_plot, nrow=1) # plot these together
+
+```
+We can thus infer than this predictive relationship between change in log payroll and change in win percentage is only marked in a handful of teams. Specifically, the following teams, whose corresponding regressions resulted in a p-value less than 0.05, with substantial Adj. R^2 values:
+
+1. Atlanta Braves 
+2. Miami Marlins 
+3. New York Yankees 
+4. Tampa Bay Rays 
+5. Toronto Blue Jays 
+
+The result of the earlier regression (across all teams) is likely driven by these 5 teams. 
 
 
 ## 4.4 Comparison
@@ -95,7 +131,7 @@ It appears based on this analysis that while there does seem to be a statistical
 baseball_model_2 <- lm(diff_win_pct ~ payroll, data = baseball_variables) # run a lm with payroll as the predictor variable
 summary(baseball_model_2) # lm output
 ```
-In order to make this comparison, I will compare the regression I ran to test the change in log pay's predictive ability, with one testing the predictive ability of payroll as such. The criteria I will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. 
+In order to make this comparison, I will compare the regression I ran to test the change in log pay's predictive ability across all teams, with one testing the predictive ability of payroll as such. The criteria I will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. 
 
 As we can see, the linear model using change in log payroll yields an Adjusted R-Squared of 0.00612, and is statistically significant at p = 0.0427. On the other hand, the linear model using payroll as such yields an Adjusted R-Squared of 0.00457 and is not statistically significant, with p = 0.0685.
 
