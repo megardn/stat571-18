@@ -121,7 +121,7 @@ radio %>% summarise(min=min(worktime, na.rm=T), max=max(worktime, na.rm=T), mean
 
 iii. Brief summary 
 
-Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!complete.cases(radio))/n)*100`% of subject's data was incomplete (i.e. missing one or more demographic variables). The number of usable responses for each variable is shown below:
+Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!complete.cases(radio))/nrow(radio))*100`% of subject's data was incomplete (i.e. missing one or more demographic variables). The number of usable responses for each variable is shown below:
 
 ``` {r summary1, echo=FALSE}
 #sample size for each variable
@@ -135,7 +135,7 @@ Summary statistics for each variable - including frequency of categorical respon
 summary(radio)
 ```
 
-The distribution of respondents' ages is plotted below. Respondents ages ranged from `r min(age, na.rm=T)` to ` r max(age, na.rm=T)` years with a mean of `r mean(age, na.rm=T)` years. 
+The distribution of respondents' ages is plotted below. Respondents ages ranged from `r min(radio$age, na.rm=T)` to ` r max(radio$age, na.rm=T)` years with a mean of `r mean(radio$age, na.rm=T)` years. 
 ``` {r age.plot}
 a <- ggplot(radio, aes(x=age)) + 
   geom_histogram(bins=25, color="white", fill= "darkblue" ) +
@@ -194,7 +194,7 @@ prc<- ggplot(newmerge) +
 prc
 ```
 
-The distribution of the time taken by each respondents to complete the survey is plotted below. Respondents time to completion ranged from `r min(worktime, na.rm=T)` to ` r max(worktime, na.rm=T)` seconds with a mean of `r mean(worktime, na.rm=T)` seconds. 
+The distribution of the time taken by each respondents to complete the survey is plotted below. Respondents time to completion ranged from `r min(radio$worktime, na.rm=T)` to ` r max(radio$worktime, na.rm=T)` seconds with a mean of `r mean(radio$worktime, na.rm=T)` seconds. 
 ``` {r worktime.plot}
 t <- ggplot(radio, aes(x=worktime)) + 
   geom_histogram(bins=25, color="white", fill= "darkgreen") + 
@@ -248,7 +248,7 @@ annotate_figure(p=comp1, top = text_grob("Age and Gender of Survey Respondents v
 Direct comparison is somewhat difficult as age data is reported by the ACS in uneven bins (eg. 60 and 61 yrs vs 45-49 yrs). However, it appears based on these data that study respondents tended to be younger than the general US population, with a lower proportion of respondents in middle age than would be expected from a representative sample. Gender is represented roughly evenly in both populations. 
 
 The distribution of reported educational attainment in the study sample are plotted alongside that of the 2014 US General population below.
-``` {r load.usa}
+``` {r load.usa.education}
 #load ACS data on education
 
 acsedu <- get_acs(geography="us", table = "B15001", year=2014, key=census_key, survey="acs1")
@@ -425,7 +425,7 @@ p*100 #percent subj listening to sirius who listen to wharton
 
 The Wharton radio listenership comprised of approximately ***`r prettyNum(p*51.6*100000, big.mark = ",")` individuals*** in January 2014, assuming that the study sample's reported listening habits are representative of the general population.
 
-The aim of the present study was to estimate the audience size of radio show Business Radio Powered by the Wharton School (Wharton Radio), available on Sirius Radio. Audience size was estimated by assessing the proportion of Sirius Radio listeners who reported listening to the Wharton talk show. Data was collected via survey on Amazon's Mechanical Turk (MTurk) platform in May 2014. Of `r n` survey respondents, `r prettyNum(wlisten, big.mark = ",")` of  `r prettyNum(slisten, big.mark = ",")` Sirius Radio listeners reported listening to Wharton radio (`r p*100`%). This ratio was extrapolated to the approximately 51.6 million Sirius listeners in 2014, resulting in an estimated `r prettyNum(p*51.6*100000, big.mark = ",")` listeners to Wharton radio. This finding is limited by sampling methodology, which was restricted to individuals enrolled in MTurk and may not be representative of Sirius Radio listeners. 
+The aim of the present study was to estimate the audience size of radio show Business Radio Powered by the Wharton School (Wharton Radio), available on Sirius Radio. Audience size was estimated by assessing the proportion of Sirius Radio listeners who reported listening to the Wharton talk show. Data was collected via survey on Amazon's Mechanical Turk (MTurk) platform in May 2014. Of `r nrow(radio)` survey respondents, `r prettyNum(wlisten, big.mark = ",")` of  `r prettyNum(slisten, big.mark = ",")` Sirius Radio listeners reported listening to Wharton radio (`r p*100`%). This ratio was extrapolated to the approximately 51.6 million Sirius listeners in 2014, resulting in an estimated `r prettyNum(p*51.6*100000, big.mark = ",")` listeners to Wharton radio. This finding is limited by sampling methodology, which was restricted to individuals enrolled in MTurk and may not be representative of Sirius Radio listeners. 
 
 
 ## New task
