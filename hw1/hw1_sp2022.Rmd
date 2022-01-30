@@ -760,7 +760,7 @@ summary(baseball_model) # lm output
 ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point(col = "steelblue4") + stat_smooth(method = "lm", col = "red3") + ggtitle("Linear Model | ∆Win Percentage ~ ∆Log Payroll | p=0.0427, Adj. R^2=0.00612") + xlab("∆Log Payroll") + ylab("∆Win Percentage")
 ```
 
-To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage as such because this provides a picture of how performance responds to our putative predictor of interest. 
+To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage because this provides a picture of how performance responds to our putative predictor of interest. 
 
 It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, at this stage my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance, or that this is only true for some teams, and these specific teams are driving the result. 
 
@@ -809,7 +809,7 @@ So, in summary, we can conclude the following: While at the aggregate level, the
 
 Which set of factors are better explaining performance? Yearly payroll or yearly increase in payroll? What criterion is being used? 
 
-In order to make this comparison, we will compare the regressions we ran to test the change in log pay's predictive ability among individual teams, with regressions testing the predictive ability of payroll as such in predicting change in win percentage, as well as both payroll and change in log payroll's ability to individually predict overall win percentage This will allow us to see if one variable better explains performance as such, change in performance, or both. In all, we will compare 4 analytic setups. 
+In order to make this comparison, we will compare the regressions we ran to test the change in log pay's predictive ability among individual teams, with regressions testing the predictive ability of raw payroll in predicting change in win percentage, as well as both payroll and change in log payroll's ability to individually predict overall win percentage This will allow us to see if one variable better explains performance as such, change in performance, or both. In all, we will compare 4 analytic setups. 
 
 The criteria we will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. We will compare how many teams achieve statistical significance and a robust effect size in each analysis. 
 
@@ -914,11 +914,11 @@ gridExtra::grid.arrange(p_plot, rsq_plot, p_plot_2, rsq_plot_2, p_plot_3, rsq_pl
 Based on the p-value and Adjusted R-Squared of our analyses:
 
 1. Change in log payroll robustly predicts change in performance for 5 teams. 
-2. Payroll as such robustly predicts change in performance for 1 team. 
-3. Payroll as such robustly predicts performance a such for 8 teams. 
-4. Change in log payroll robustly predicts performance as such for 2 teams.
+2. Payroll robustly predicts change in performance for 1 team. 
+3. Payroll robustly predicts performance for 8 teams. 
+4. Change in log payroll robustly predicts performance for 2 teams.
 
-As we can see, it seems that change in log payroll better predicts change in win percentage, while payroll as such better predicts win percentage as such. So, the predictor variable we should use will depend on how we define "explaining performance". 
+As we can see, it seems that change in log payroll better predicts change in win percentage, while raw payroll better predicts win percentage. So, the predictor variable we should use will depend on how we define "explaining performance". 
 
 
 
