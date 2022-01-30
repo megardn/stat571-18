@@ -32,7 +32,7 @@ options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
 
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr, foreign, kableExtra)
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr, foreign) # kableExtra
 
 ```
 
@@ -456,7 +456,7 @@ Our goal is to answer the above questions only through EDA (Exploratory Data Ana
 
 Notice the data came in as an Excel file. We need to use the package `readxl` and the function `read_excel()` to read the data `WomenData_06_16.xlsx` into R. 
 
-
+First, we load the data using readxl,rename Field and Number variables, change Field names to shorter labels and transform relevant variables (Field, Degree, Sex) to factors.
 
 ```{r load data}
 # i. Read the data into R
@@ -500,13 +500,18 @@ max(w_df$Year) - min(w_df$Year)
 ```
 
 ```{r summary table, results='hold'}
-# preparing html output table
-kbl(summary(w_df)) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 
+# preparing html output table
+summary(w_df)
+
+# nicer table with kableExtra
+# kbl(summary(w_df)) %>%
+#   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 2. Write a summary describing the data set provided here. 
+
+This dataset comprises 5 variables (Field, Degree, Sex, Year and Number). None of the variables seem to have NAs. The number of awarded degrees is reported for several science fields, across 3 degrees (BS, MS, PhD) and over a period of 10 years (2006-2016).
 
 i. How many fields are there in this data?
 
@@ -527,6 +532,8 @@ Is there evidence that more males are in science-related fields vs `Non-S&E`? Pr
 
 ### Summary statistics by field and gender
 
+First, we are creating an aggregated table showing the total number of awarded degrees by Field and Sex.  
+
 ```{r summary statistics, message=FALSE, warning=FALSE, results="hold"}
 
 # summarizing by field and sex
@@ -535,14 +542,17 @@ agg <- w_df %>%
   summarise(
     Total_Number = sum(Number)
     )
+agg
 
-# preparing html output table
-kbl(agg) %>%
-  kable_paper() %>%
-    scroll_box(height = "300px")
+# #  nicer table with kableExtra
+# kbl(agg) %>%
+#   kable_paper() %>%
+#     scroll_box(height = "300px")
 ```
 
 ### Plots by field and gender
+
+Here, we are creating a new science vs non-science fields variable, so that we can plot the total number of awarded degrees in science vs non-science fields overall. Next, we plot the total number of awarded degrees by subfields and gender.  
 
 ```{r plotting by gender and field, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
 # disabling scientific notation for plotting
@@ -636,7 +646,9 @@ These plots confirm that the proportion of females is higher in `Non-S&E` fields
 
 ## EDA bringing type of degree, field and gender in 2015
 
-Describe the number of people by type of degree, field, and gender. Do you see any evidence of gender effects over different types of degrees? Again, provide graphs to summarize your findings.
+Describe the number of people by type of degree, field, and gender. Do you see any evidence of gender effects over different types of degrees? Again, provide graphs to summarize your findings.  
+
+Here, we create a plot showing of number of awarded degrees by degree, field and gender and filter data to only show the year 2015.   
 
 ```{r plotting field and gender for 2015, fig.width=10, fig.height=6}
 
@@ -683,12 +695,12 @@ agg <- w_df %>%
   filter(Sex == "Female") %>%
   group_by(Field_type, Year, Degree) %>% 
   summarise("Percent female" = percent)
+agg
 
-
-# preparing html table
-kbl(agg) %>%
-  kable_paper() %>%
-    scroll_box(height = "300px", width = "50%")
+# nicer table with kableExtra
+# kbl(agg) %>%
+#   kable_paper() %>%
+#     scroll_box(height = "300px", width = "50%")
 
 ```
   
@@ -708,12 +720,12 @@ agg <- w_df %>%
   filter(Sex == "Female") %>%
   group_by(Field, Year, Degree) %>% 
   summarise("Percent female" = percent)
+agg
 
-
-# nicer html table
-kbl(agg) %>%
-  kable_paper() %>%
-    scroll_box(height = "300px", width = "50%")
+# nicer table with kableExtra
+# kbl(agg) %>%
+#   kable_paper() %>%
+#     scroll_box(height = "300px", width = "50%")
 
 ```
   
@@ -735,12 +747,12 @@ agg <- w_df %>%
   filter(Year == "2016") %>%
   group_by(Field, Degree) %>% 
   summarise("2006-2016 percent change in females" = round(percent_change, 1))
+agg
 
-
-# preparing html table
-kbl(agg) %>%
-  kable_paper() %>%
-    scroll_box(height = "300px", width = "50%")
+# nicer table with kableExtra
+# kbl(agg) %>%
+#   kable_paper() %>%
+#     scroll_box(height = "300px", width = "50%")
 
 ```
 
@@ -748,6 +760,8 @@ We can observe that overall, the percent of females receiving a degree in variou
 
 
 ### Plots by field, gender and time
+
+In this section, we are plotting the data summarized numerically above. First, we plot overall science vs non-science fields by degree type and time.  
 
 ```{r plot by field type gender degree and time, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
 
@@ -769,7 +783,9 @@ w_df %>% group_by(Field_type, Sex, Year, Degree) %>%
 ```
 
   
-Overall, `Science fields` seem to have roughly 50% women, indicating a roughly equal representation of males and females when considering all science fields together. Of note, we observe a progressive increase in the proportion of males at the MS and PhD levels, compared to BS which has a roughly equal representation of both genders.   
+Overall, `Science fields` seem to have roughly 50% women, indicating a roughly equal representation of males and females when considering all science fields together. Of note, we observe a progressive increase in the proportion of males at the MS and PhD levels, compared to BS which has a roughly equal representation of both genders.  
+
+Next, we repeat the same plotting strategy by plot by science subfields to get a more granular level of information.  
 
 ```{r plot by field gender degree and time, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
 
@@ -795,12 +811,15 @@ w_df %>% group_by(Field, Sex, Year, Degree) %>%
 
   
 
-These graphs again highlight that even though overall, `Science fields` seem to have roughly 50% women, this does not hold true when considering science subfields at a more granular level. Specifically, we note the markedly higher proportion of men in `Engineering`, `Computer Sciences`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` and the higher proportion of women in `Psychology`, `Non-S&E` and `Biological Sciences`. Moreover, gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields.   
+These graphs again highlight that even though overall, `Science fields` seem to have roughly 50% women, this does not hold true when considering science subfields at a more granular level. Specifically, we note the markedly higher proportion of men in `Engineering`, `Computer Sciences`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` and the higher proportion of women in `Psychology`, `Non-S&E` and `Biological Sciences`. Moreover, gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields. 
+
 
 ## Women in Data Science
   
 
 Finally, is there evidence showing that women are underrepresented in data science? Data science is an interdisciplinary field of computer science, math, and statistics. You may include year and/or degree.  
+
+In this section, we are plotting the proprtion of awarded degrees for data science fields by sex, degree and time.  
 
 ```{r plotting data science fields, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
 
