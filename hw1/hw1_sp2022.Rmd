@@ -977,7 +977,7 @@ i. To describe the increment of payroll in each year there are several possible 
 
 Explain why the log difference is more appropriate in this setup.
 
-Read in Data
+First we'll read in the data and, to make sure we have what we need, display the first 5 rows. 
 ```{r, results=TRUE}
 baseball <- read.csv(file = 'data/baseball.csv') # read in the long-format csv as a data.frame
 head(baseball, 5) # display the first 5 rows
@@ -1006,6 +1006,9 @@ head(baseball_variables, 5) # let's take a look to make sure we've got what we n
 i. Which five teams had highest increase in their payroll between years 2010 and 2014, inclusive?
 
 ii. Between 2010 and 2014, inclusive, which team(s) "improved" the most? That is, had the biggest percentage gain in wins?
+
+To do this, we will isolate data from the years 2014 and 2010, and create a new variable detailing the difference in pay and win percentage between these years. To see the top 5 teams, we will display the top 5 entries in a new data.frame containing this information. 
+
 ```{r, results=TRUE}
 # to answer these questions, let's create a new data.frame that contains each team, their corresponding log change in payroll between 2010 and 2014, and their corresponding change in win percentage between those same years
 baseball_variables_2010_2014 <- data.frame(unique(baseball_variables$team), 
@@ -1023,6 +1026,7 @@ baseball_variables_2010_2014 %>%
   arrange(desc(diff_win_pct_2014_2010)) %>% # order rows by descending win_pct change
   head(5) # show the top 5
 ```
+
 As we can see, the top 5 teams with the highest log payroll increase between 2010 and 2014 are:
 
 1.	Los Angeles Dodgers	
@@ -1046,6 +1050,8 @@ Is there evidence to support the hypothesis that higher increases in payroll on 
 
 Pick up a few statistics, accompanied with some data visualization, to support your answer. 
 
+To test this I will run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage because this provides a picture of how performance responds to our putative predictor of interest. 
+
 ```{r, results=TRUE}
 # run a linear model to evaluate the regression of diff_log on change in win percentage 
 baseball_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables)
@@ -1055,9 +1061,7 @@ summary(baseball_model) # lm output
 ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point(col = "steelblue4") + stat_smooth(method = "lm", col = "red3") + ggtitle("Linear Model | ∆Win Percentage ~ ∆Log Payroll | p=0.0427, Adj. R^2=0.00612") + xlab("∆Log Payroll") + ylab("∆Win Percentage")
 ```
 
-To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage because this provides a picture of how performance responds to our putative predictor of interest. 
-
-It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, at this stage my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance, or that this is only true for some teams, and these specific teams are driving the result. 
+It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, at this stage my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance, or that this is only true for some teams, and these specific teams are driving the result.
 
 We have established that aggregating across all teams, there is a small predictive relationship between change in log payroll and change in performance. However, we can dive deeper and see if this is true for all teams, or just a subset of teams. It is possible that for some teams there is a stronger predictive relationship than others. To test this, I will conduct a regression for each team, evaluating the change in log payroll as a predictor of change in performance. 
 
