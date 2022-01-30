@@ -2,14 +2,11 @@
 title: " Modern Data Mining, HW 1"
 author:
 - Joelle Bagautdinova
-- Diego Davila
+- Diego G. Davila
 - Margaret Gardner
+
 date: 'Due: 11:59PM,  Jan. 30th, 2021'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: show
     highlight: haddock
@@ -18,6 +15,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -26,11 +27,13 @@ urlcolor: blue
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4)
+knitr::opts_chunk$set(echo = TRUE, results = "hide", fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr, foreign)
+
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr, foreign, kableExtra)
+
 ```
 
 
@@ -454,38 +457,383 @@ Our goal is to answer the above questions only through EDA (Exploratory Data Ana
 Notice the data came in as an Excel file. We need to use the package `readxl` and the function `read_excel()` to read the data `WomenData_06_16.xlsx` into R. 
 
 
-i. Read the data into R.
-ii. Clean the names of each variables. (Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number` )
-iii. Set the variable natures properly. 
-iv. Any missing values?
+
+```{r load data}
+# i. Read the data into R
+w_df <- read_excel("data/WomenData_06_16.xlsx")
+
+# ii. Clean the names of each variables. 
+# Change variable names to  `Field`,`Degree`, `Sex`, `Year` and `Number`. 
+w_df <- w_df %>% rename("Field" = "Field and sex",
+                        "Number" = "Degrees Awarded")
+
+# iii. Set the variable natures properly
+str(w_df)
+
+# renaming a field name to shorter name
+w_df[w_df$Field == "Earth, atmospheric, and ocean sciences", "Field"] <- "Environmental"
+w_df[w_df$Field == "Mathematics and statistics", "Field"] <- "Math & Stats"
+w_df[w_df$Field == "Agricultural sciences", "Field"] <- "Agriculture"
+w_df[w_df$Field == "Biological sciences", "Field"] <- "Biology"
+w_df[w_df$Field == "Social sciences", "Field"] <- "Sociology"
+w_df[w_df$Field == "Computer sciences", "Field"] <- "Computer"
+w_df[w_df$Field == "Physical sciences", "Field"] <- "Physics"
+
+# Changing categorical variables from character to factor type
+w_df %<>% mutate(Field = as.factor(Field),
+         Degree = as.factor(Degree),
+         Sex = as.factor(Sex))
+
+# iv. Any missing values?
+summary(w_df)
+# no missing values. 
+
+# count the number of fields
+length(unique(w_df$Field))
+
+# count the number of degrees
+length(unique(w_df$Degree))
+
+# count the number of years reported
+max(w_df$Year) - min(w_df$Year)
+
+```
+
+```{r summary table, results='hold'}
+# preparing html output table
+kbl(summary(w_df)) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+```
 
 2. Write a summary describing the data set provided here. 
 
 i. How many fields are there in this data?
+
+There are `r length(unique(w_df$Field))` different fields of study in this dataset. 
+
 ii. What are the degree types? 
+
+There are `r length(unique(w_df$Degree))` degree types. 
+
 iii. How many year's statistics are being reported here? 
 
+This dataset is reporting degrees for a duration of `r max(w_df$Year) - min(w_df$Year)` years. 
 
 
 ## BS degrees in 2015
 
 Is there evidence that more males are in science-related fields vs `Non-S&E`? Provide summary statistics and a plot which shows the number of people by gender and by field. Write a brief summary to describe your findings.
 
+### Summary statistics by field and gender
+
+```{r summary statistics, message=FALSE, warning=FALSE, results="hold"}
+
+# summarizing by field and sex
+agg <- w_df %>% 
+  group_by(Field, Sex) %>% 
+  summarise(
+    Total_Number = sum(Number)
+    )
+
+# preparing html output table
+kbl(agg) %>%
+  kable_paper() %>%
+    scroll_box(height = "300px")
+```
+
+### Plots by field and gender
+
+```{r plotting by gender and field, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+# disabling scientific notation for plotting
+options(scipen = 999)
+
+# creating new science vs non-science fields variable
+w_df$Field_type <- ifelse(w_df$Field == "Non-S&E", c("Non-S&E fields"), c("Science fields"))
+
+# getting total number of degrees per field type
+w_df %>% group_by(Field_type, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field type (while sorting data by max number in males per field)
+  ggplot(aes(x = Field_type, y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field type and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10))
+
+
+# getting total number of degrees per field
+w_df %>% group_by(Field, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field (while sorting data by max number in males per field)
+  ggplot(aes(x = forcats::fct_reorder(Field, total_number), y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Total number") +
+    ggtitle("Number of awarded degrees by field of study and gender") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 10))
+
+
+```
+  
+Based on the above evidence, it appears that the number of men in `Science fields` is comparable to the number of women. This constrasts with `Non-S&E` fields, which comprises a much larger number of women. This finding should however be nuanced by the fact that subfields within `Science fields` show very different male/female proportions. For instance, `Biological Sciences` and `Psychology` have a majority of female students, while `Computer sciences` and `Engineering` have a majority of male students.  
+
+An additional observation is that the number of students in `Non-S&E` fields overall is much larger than in `Science fields`. To further improve the visualization of gender proportions, we created a graph displaying the propotions of each gender (rather than total number) in different fields.
+
+```{r plotting proportions, message=FALSE, warning=FALSE}
+
+# getting total number of degrees per field type
+w_df %>% group_by(Field_type, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  # bar plots per gender and field type (while sorting data by max number in males per field)
+  ggplot(aes(x = Field_type, y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Proportion") +
+    ggtitle("Proportion of awarded degrees by sex and field of study") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10))
+
+
+# getting total number of degrees per field 
+w_df %>% group_by(Field, Sex) %>%
+  summarise(total_number = sum(Number)) %>%
+  arrange(desc(total_number))  %>%
+  ggplot(aes(x = fct_reorder(Field, total_number), y = total_number, fill = Sex, colour = Sex)) + 
+    geom_bar(stat = "identity", position = "fill", alpha = 0.8, width = 0.5) +
+    theme_bw() +
+    labs(x="Fields of study", y = "Proportion") +
+    ggtitle("Proportion of awarded degrees by sex and field type") +
+    theme(plot.title = element_text(face="bold", size = 15)) +
+    theme(legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 10))
+
+
+```
+  
+These plots confirm that the proportion of females is higher in `Non-S&E` fields, but is roughly 50% in `Science fields`. When considering science subfields, `Computer Sciences`, `Engineering`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` seem to have a clear larger proportion of males. Thus, when considering all science fields together, there is no evidence of a larger pproportion of males. yet when considering by subfields there are striking differences in gender proportions.  
+
+
+
+
 ## EDA bringing type of degree, field and gender in 2015
 
 Describe the number of people by type of degree, field, and gender. Do you see any evidence of gender effects over different types of degrees? Again, provide graphs to summarize your findings.
+
+```{r plotting field and gender for 2015, fig.width=10, fig.height=6}
+
+# plot showing number of awarded degrees by gender (color) for the year 2015
+w_df %>%
+  filter(Year == 2015) %>%
+  ggplot(aes(x = forcats::fct_reorder(Field, Number), y = Number, fill = Sex, colour = Sex)) + 
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8, width = 0.5) +
+  facet_grid(Degree~., scales = "free_y") +
+  theme_bw() +
+  labs(x="Fields of study") +
+  ggtitle("Number of awarded degrees in 2015 by type of degree, field and gender") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 10))
+
+```
+
+  
+In 2015, the number of awarded bachelor degrees is larger overall in comparison to master and PhD degrees. Gender proportions are mostly similar in different degree types for a given subfield. However, some striking exceptions in this plot are `Engineering` and `Physical Sciences`, for which the number of males is much higher at the PhD level, as well as `Psychology`, which has a higher number of women at the PhD level.
+
+
 
 ## EDA bring all variables 
 
 In this last portion of the EDA, we ask you to provide evidence numerically and graphically: Do the number of  degrees change by gender, field, and time? 
 
-## Women in Data Science
+### Summary statistics by field, gender and time
 
-Finally, is there evidence showing that women are underrepresented in data science? Data science is an interdisciplinary field of computer science, math, and statistics. You may include year and/or degree.
+
+First, we are providing a numeric summary of the percentage of female students per field type, degree type and year. 
+  
+```{r summary of percent female per field type degree and year, message=FALSE, warning=FALSE, results="hold"}
+
+# summarizing by field type, degree, time and sex
+agg <- w_df %>% 
+  group_by(Field_type, Sex, Year, Degree) %>% 
+  summarise(total_number = sum(Number)) %>%
+  group_by(Field_type, Year, Degree) %>% 
+  mutate(percent = (total_number / sum(total_number)) * 100) %>%
+  filter(Sex == "Female") %>%
+  group_by(Field_type, Year, Degree) %>% 
+  summarise("Percent female" = percent)
+
+
+# preparing html table
+kbl(agg) %>%
+  kable_paper() %>%
+    scroll_box(height = "300px", width = "50%")
+
+```
+  
+We can observe that overall, the percent of women in science fields tends to be more equal at the BS level in most fields, but decreases in MS and PhD levels.  
+
+Next, we are providing a numeric summary of the percentage of female students per subfield, degree type and year.
+
+
+```{r summary of percent female per field degree and year, message=FALSE, warning=FALSE, results="hold"}
+
+# summarizing by field, degree, time and sex
+agg <- w_df %>% 
+  group_by(Field, Sex, Year, Degree) %>% 
+  summarise(total_number = sum(Number)) %>%
+  group_by(Field, Year, Degree) %>% 
+  mutate(percent = (total_number / sum(total_number)) * 100) %>%
+  filter(Sex == "Female") %>%
+  group_by(Field, Year, Degree) %>% 
+  summarise("Percent female" = percent)
+
+
+# nicer html table
+kbl(agg) %>%
+  kable_paper() %>%
+    scroll_box(height = "300px", width = "50%")
+
+```
+  
+We can observe that the percent female tends to remain stable over time in any given field, and decreases somewhat at the PhD level.  
+  
+Next, we are providing a summary of the difference in percent females per field and degree type between the year 2006 and 2006. 
+  
+
+```{r summary of percent change per field between 2006-2016, message=FALSE, warning=FALSE, results="hold"}
+# summarizing the percent change from 2006-2016 by field, degree and sex
+agg <- w_df %>% 
+  group_by(Field, Sex, Year, Degree) %>% 
+  summarise(total_number = sum(Number)) %>%
+  group_by(Field, Year, Degree) %>% 
+  mutate(percent = (total_number / sum(total_number)) * 100) %>%
+  filter(Sex == "Female" & (Year == "2006" | Year == "2016")) %>%
+  group_by(Field, Degree) %>% 
+  mutate(percent_change = percent - lag(percent)) %>%
+  filter(Year == "2016") %>%
+  group_by(Field, Degree) %>% 
+  summarise("2006-2016 percent change in females" = round(percent_change, 1))
+
+
+# preparing html table
+kbl(agg) %>%
+  kable_paper() %>%
+    scroll_box(height = "300px", width = "50%")
+
+```
+
+We can observe that overall, the percent of females receiving a degree in various fields remains stable, with a maximum of 5.8% change in `Agricultural Sciences` at the PhD level (showing an increase of women at the PhD level over time in this subfield).  
+
+
+### Plots by field, gender and time
+
+```{r plot by field type gender degree and time, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+
+# plot by field type, degree, time and sex
+w_df %>% group_by(Field_type, Sex, Year, Degree) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field_type, scales = "free_y") +
+  theme_bw() +
+  labs(x="Fields of study", y = "Proportion") +
+  ggtitle("Proportion of awarded degrees by sex, degree and field type") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10))
+```
+
+  
+Overall, `Science fields` seem to have roughly 50% women, indicating a roughly equal representation of males and females when considering all science fields together. Of note, we observe a progressive increase in the proportion of males at the MS and PhD levels, compared to BS which has a roughly equal representation of both genders.   
+
+```{r plot by field gender degree and time, fig.width=10, fig.height=6, message=FALSE, warning=FALSE}
+
+# plot by subfield, degree, time and sex
+w_df %>% group_by(Field, Sex, Year, Degree) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field, scales = "free_x") +
+  ggtitle("Proportion of awarded degrees by sex, degree and field of study") +
+  theme_bw() +
+  labs(x="Time", y = "Proportion") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 5), 
+        axis.text.y = element_text(size = 10)) +
+  scale_x_continuous(breaks = seq(2006, 2016, 10)) +
+  theme(panel.spacing.x = unit(1, "mm"))
+
+```
+
+  
+
+These graphs again highlight that even though overall, `Science fields` seem to have roughly 50% women, this does not hold true when considering science subfields at a more granular level. Specifically, we note the markedly higher proportion of men in `Engineering`, `Computer Sciences`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences` and the higher proportion of women in `Psychology`, `Non-S&E` and `Biological Sciences`. Moreover, gender proportions tend to remain table across the years (2006-2016), regardless of field type (`Non-S&E` vs `Science fields`) or subfields.   
+
+## Women in Data Science
+  
+
+Finally, is there evidence showing that women are underrepresented in data science? Data science is an interdisciplinary field of computer science, math, and statistics. You may include year and/or degree.  
+
+```{r plotting data science fields, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+# plot by degree, time and sex for data science fields only
+w_df %>% group_by(Field, Sex, Year, Degree) %>%
+  filter(Field %in% c("Computer", "Math & Stats")) %>%
+  summarise(total_number = sum(Number)) %>%
+  ggplot(aes(x = Year, y = total_number, fill = Sex)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_grid(Degree ~ Field, scales = "free_x") +
+  ggtitle("Proportion of awarded degrees in data science by sex, degree and time") +
+  theme_bw() +
+  labs(x="Time", y = "Proportion") +
+  theme(plot.title = element_text(face="bold", size = 15)) +
+  theme(legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10)) +
+  theme(panel.spacing.x = unit(1, "mm"))
+
+```
+   
+This graph provides clear evidence for an underrepresentation of women in data science, as `Computer Sciences` only comprises around 25% of women across all degree types (BS, MS, PhD), and `Mathematics and Statistics` comprises around 50-60% women, with a neat decrease in female representation at the PhD level (~25% women).  
+
 
 ## Final brief report
 
 Summarize your findings focusing on answering the questions regarding if we see consistent patterns that more males pursue science-related fields. Any concerns with the data set? How could we improve on the study?
+  
+When considering all science fields together, the proportion of males and females engaging in science related fields appears similar and has remained balanced from 2006-2016, with a slight increase in the propotion of males at MS and PhD levels. However, when considering gender proportions in subfields of science, we notice a remarkable variation. Specifically, while a number of subfields appear balanced (`Agricultural sciences`, `Social Sciences`), certain subfields contain a strikingly larger proportion of women (`Psychology`, `Biological Sciences`) or men (`Computer Sciences`, `Engineering`, `Physical Sciences`, `Mathematics and Statistics`, `Environmnental Sciences`) respectively. Finally, these gender proportions remained stable across the considered 10 year period (2006-2016). 
+
+To further improve on the study, it would be interesting to investigate gender proportions among subfields within the `Non-S$E` category. Given that large discrepancies in gender proportions were found when studying science subfields even though the overall gender propotion seemed balanced, it is possible that gender proportions in subfields of `Non-S&E` also might vary a lot compared to the overall proportion reported in this dataset. It would also be interesting to collect this type of data in more recent years to determine whether the trends are now changing or still remain stable. Finally, another avenue to explore would be gender distributions across professions and type of function several years after graduation.
 
 ## Appendix
 
@@ -493,28 +841,28 @@ To help out, we have included some R-codes here as references. You should make y
 
 1. Clean data
 
-```{r data wrangling, echo = FALSE, warning = FALSE}
+```{r data wrangling, echo = FALSE, warning = FALSE, eval=FALSE}
 # For the demonstration purpose, we show this R-chunk by taking echo=TRUE
 # In your final report you should hide all the R-chunks to keep your report flowing well.
-wsci <- read_excel("WomenData_06_16.xlsx")
+wsci <- read_excel("data/WomenData_06_16.xlsx")
 names(wsci)
 head(wsci)
 #change names
-wsci %<>% 
-  rename(Field = 'Field and sex')
-# set the field, degree and sex as factors
-wsci %<>% 
-  mutate( Field = as.factor(Field))
+# wsci %<>% 
+#   rename(Field = 'Field and sex')
+# # set the field, degree and sex as factors
+# wsci %<>% 
+#   mutate( Field = as.factor(Field))
 ```
 
 
-```{r, echo=FALSE}
-# wsci %<>%
-#   rename(Field = "Field and sex",
-#          Number = "Degrees Awarded") %>%
-#   mutate(Field = as.factor(Field),
-#          Degree = as.factor(Degree),
-#          Sex = as.factor(Sex))
+```{r, echo=FALSE, eval=FALSE}
+wsci %<>%
+  rename(Field = "Field and sex",
+         Number = "Degrees Awarded") %>%
+  mutate(Field = as.factor(Field),
+         Degree = as.factor(Degree),
+         Sex = as.factor(Sex))
 
 ```
 
@@ -629,16 +977,67 @@ i. To describe the increment of payroll in each year there are several possible 
 
 Explain why the log difference is more appropriate in this setup.
 
+Read in Data
+```{r, results=TRUE}
+baseball <- read.csv(file = 'data/baseball.csv') # read in the long-format csv as a data.frame
+head(baseball, 5) # display the first 5 rows
+```
 ii. Create a new variable `diff_log=log(payroll_2013) - log(payroll_2012)`. Hint: use `dplyr::lag()` function.
 
 iii. Create a long data table including: team, year, diff_log, win_pct
 
+First, we create a new variable called diff_lag, which describes the log difference between a year's payroll and the previous years' payroll.
+
+In this setup, it is more appropriate to work with log-transformed data because it is more informative about *relative* differences than the raw amount of payroll increase. In other words, the same amount of raw change in payroll would represent a more significant increase to a team earning less, than a team earning more, so we can take the differences of the log values to address this. 
+```{r, results=TRUE}
+baseball$diff_log <-  log(baseball$payroll) - log(lag(baseball$payroll)) # here we create the new variable of differences of log values
+baseball$diff_win_pct <-  baseball$win_pct - lag(baseball$win_pct) # I'm also going to create a variable that describes the change in win_pct, which will be useful in 4.2 and later sections
+
+# now, we create a new table with our variables of interest
+baseball_variables <- baseball %>% 
+  select(team, year, diff_log, payroll, win_pct, diff_win_pct) %>%
+  na.omit # Because the first year in our data will not have a computable change from the previous year, it will produce an NA in the diff_log column. This particular row will not contain information relevant to our analysis, so we can simply omit the rows that have NAs. 
+
+head(baseball_variables, 5) # let's take a look to make sure we've got what we need
+```
 
 ## Exploratory questions
 
 i. Which five teams had highest increase in their payroll between years 2010 and 2014, inclusive?
 
 ii. Between 2010 and 2014, inclusive, which team(s) "improved" the most? That is, had the biggest percentage gain in wins?
+```{r, results=TRUE}
+# to answer these questions, let's create a new data.frame that contains each team, their corresponding log change in payroll between 2010 and 2014, and their corresponding change in win percentage between those same years
+baseball_variables_2010_2014 <- data.frame(unique(baseball_variables$team), 
+                                           log(baseball_variables$payroll[baseball_variables$year == 2014]) - log(baseball_variables$payroll[baseball_variables$year == 2010]),
+                                           baseball_variables$win_pct[baseball_variables$year == 2014] - baseball_variables$win_pct[baseball_variables$year == 2010]) 
+colnames(baseball_variables_2010_2014) <- c('team', 'diff_log_2014_2010', 'diff_win_pct_2014_2010') # appropriately name the columns
+
+# now, let's see which 5 teams had the largest increase in payroll between 2010 and 2014
+baseball_variables_2010_2014 %>%
+  arrange(desc(diff_log_2014_2010)) %>% # order rows by descending log pay change
+  head(5) # show the top 5
+
+# which 5 teams had the largest increase in win percentage between 2010 and 2014?
+baseball_variables_2010_2014 %>%
+  arrange(desc(diff_win_pct_2014_2010)) %>% # order rows by descending win_pct change
+  head(5) # show the top 5
+```
+As we can see, the top 5 teams with the highest log payroll increase between 2010 and 2014 are:
+
+1.	Los Angeles Dodgers	
+2.	Texas Rangers	
+3.	San Diego Padres	
+4.	Pittsburgh Pirates	
+5.	Washington Nationals
+
+And the top 5 teams with the highest win percentage increase between 2010 and 2014 are: 
+
+1.	Pittsburgh Pirates	
+2.	Baltimore Orioles	
+3.	Washington Nationals
+4.	Seattle Mariners	
+5.	Kansas City Royals
 
 
 ## Do log increases in payroll imply better performance? 
@@ -647,9 +1046,175 @@ Is there evidence to support the hypothesis that higher increases in payroll on 
 
 Pick up a few statistics, accompanied with some data visualization, to support your answer. 
 
+```{r, results=TRUE}
+# run a linear model to evaluate the regression of diff_log on change in win percentage 
+baseball_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables)
+summary(baseball_model) # lm output
+
+# ok, let's plot the lm 
+ggplot(baseball_variables, aes(x = diff_log, y = diff_win_pct)) + geom_point(col = "steelblue4") + stat_smooth(method = "lm", col = "red3") + ggtitle("Linear Model | ∆Win Percentage ~ ∆Log Payroll | p=0.0427, Adj. R^2=0.00612") + xlab("∆Log Payroll") + ylab("∆Win Percentage")
+```
+
+To test this I have run a linear regression analysis, testing how well change in log payroll predicts change in win percentage. I am using change in win percentage as my dependent variable as opposed to win percentage because this provides a picture of how performance responds to our putative predictor of interest. 
+
+It appears based on this analysis that while there does seem to be a statistically significant association between log increase in pay and increase in performance (p = 0.043), the effect size is small (Adj. R-Squared = 0.00612). Accordingly, at this stage my interpretation is that while there is in fact evidence that an increase in payroll may lead to an increase in performance, it is likely that change in payroll alone does not adequately explain performance, or that this is only true for some teams, and these specific teams are driving the result. 
+
+We have established that aggregating across all teams, there is a small predictive relationship between change in log payroll and change in performance. However, we can dive deeper and see if this is true for all teams, or just a subset of teams. It is possible that for some teams there is a stronger predictive relationship than others. To test this, I will conduct a regression for each team, evaluating the change in log payroll as a predictor of change in performance. 
+
+```{r, results=TRUE, fig.height = 8, fig.width = 12}
+# since we'll be running many linear regressions (one for each team), it's best to initialize empty arrays to contain p-value and effect size (adj. R^2) of each regression
+p_vector <- rep(NA, length(unique(baseball_variables$team))) # initialize p-value vector
+effect_vector <- rep(NA, length(unique(baseball_variables$team))) # initialize effect size vector 
+# this loop runs a regression on each team - every iteration corresponds to a single team
+for (i in 1:length(unique(baseball_variables$team))){
+  temporary_model <- lm(diff_win_pct ~ diff_log, data = baseball_variables %>% filter(team == unique(baseball_variables$team)[i])) # run the regression, select only the rows that pertain to the team of interest
+  p_vector[i] <- summary(temporary_model)$coefficients["diff_log",4] # extract the p-value 
+  effect_vector[i] <- summary(temporary_model)$adj.r.squared # extract the adjusted R^2
+}
+
+# great! now let's create a data.frame that contains p-value, effect size, and team
+teamwise_regression_result <- data.frame(team = unique(baseball_variables$team), p_value = p_vector, effect_size = effect_vector)
+
+# visualize results
+# create a bar plot showing each team's p-value in their regression
+p_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regressions p-value") + theme(legend.position = "none", axis.title.x=element_blank()) + ylab("p-value") 
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regressions Adj. R^2") + theme(legend.position = "none", axis.title.x=element_blank()) + ylab("Effect Size (Adj. R-Squared)")
+gridExtra::grid.arrange(p_plot, rsq_plot, nrow=1) # plot these together
+```
+
+From these results, we can thus infer than this predictive relationship between change in log payroll and change in win percentage is only present in a handful of teams. Specifically, the following teams, whose corresponding regressions resulted in a p-value less than 0.05, with substantial Adj. R^2 values:
+
+1. Atlanta Braves 
+2. Miami Marlins 
+3. New York Yankees 
+4. Tampa Bay Rays 
+5. Toronto Blue Jays 
+
+The result of the earlier regression (across all teams) is likely driven by these 5 teams. 
+
+So, in summary, we can conclude the following: While at the aggregate level, there is evidence that an increase in log payroll may lead to an increase in win percentage, the win percentage of the five teams listed above exhibit a robust response to change in log payroll, while other teams do not. 
+
 ## Comparison
 
 Which set of factors are better explaining performance? Yearly payroll or yearly increase in payroll? What criterion is being used? 
+
+In order to make this comparison, we will compare the regressions we ran to test the change in log pay's predictive ability among individual teams, with regressions testing the predictive ability of raw payroll in predicting change in win percentage, as well as both payroll and change in log payroll's ability to individually predict overall win percentage This will allow us to see if one variable better explains performance as such, change in performance, or both. In all, we will compare 4 analytic setups. 
+
+The criteria we will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. We will compare how many teams achieve statistical significance and a robust effect size in each analysis. 
+
+```{r, results=TRUE, fig.height = 8, fig.width = 12}
+# ----------------- #
+#    Analysis 2     #
+# ----------------- #
+
+# Let's run the analysis using Payroll to predict change in win percentage
+p_vector_2 <- rep(NA, length(unique(baseball_variables$team))) # initialize p-value vector
+effect_vector_2 <- rep(NA, length(unique(baseball_variables$team))) # initialize effect size vector 
+# this loop runs a regression on each team - every iteration corresponds to a single team
+for (i in 1:length(unique(baseball_variables$team))){
+  temporary_model <- lm(diff_win_pct ~ payroll, data = baseball_variables %>% filter(team == unique(baseball_variables$team)[i])) # run the regression, select only the rows that pertain to the team of interest
+  p_vector_2[i] <- summary(temporary_model)$coefficients["payroll",4] # extract the p-value 
+  effect_vector_2[i] <- summary(temporary_model)$adj.r.squared # extract the adjusted R^2
+}
+# great! now let's create a data.frame that contains p-value, effect size, and team
+teamwise_regression_result_2 <- data.frame(team = unique(baseball_variables$team), p_value = p_vector_2, effect_size = effect_vector_2)
+# Save plots
+# create a bar plot showing each team's p-value in their regression
+p_plot_2 <- ggplot(data=teamwise_regression_result_2, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise ∆Win Percentage ~ Payroll Regressions p-value") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("p-value") 
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot_2 <- ggplot(data=teamwise_regression_result_2, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise ∆Win Percentage ~ Payroll Regressions Adj. R^2") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("Adj. R-Squared")
+
+# ----------------- #
+#    Analysis 3     #
+# ----------------- #
+
+# now, let's run the analysis using Payroll to predict Win Percentage
+p_vector_3 <- rep(NA, length(unique(baseball_variables$team))) # initialize p-value vector
+effect_vector_3 <- rep(NA, length(unique(baseball_variables$team))) # initialize effect size vector 
+# this loop runs a regression on each team - every iteration corresponds to a single team
+for (i in 1:length(unique(baseball_variables$team))){
+  temporary_model <- lm(win_pct ~ payroll, data = baseball_variables %>% filter(team == unique(baseball_variables$team)[i])) # run the regression, select only the rows that pertain to the team of interest
+  p_vector_3[i] <- summary(temporary_model)$coefficients["payroll",4] # extract the p-value 
+  effect_vector_3[i] <- summary(temporary_model)$adj.r.squared # extract the adjusted R^2
+}
+# great! now let's create a data.frame that contains p-value, effect size, and team
+teamwise_regression_result_3 <- data.frame(team = unique(baseball_variables$team), p_value = p_vector_3, effect_size = effect_vector_3)
+# visualize results
+# create a bar plot showing each team's p-value in their regression
+p_plot_3 <- ggplot(data=teamwise_regression_result_3, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise Win Percentage ~ Payroll Regressions p-value") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("p-value") 
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot_3 <- ggplot(data=teamwise_regression_result_3, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise Win Percentage ~ Payroll Regressions Adj. R^2") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("Adj. R-Squared")
+
+# ----------------- #
+#    Analysis 4     #
+# ----------------- #
+
+# finally, let's run the analysis to test how well change in payroll predicts win_percentage
+p_vector_4 <- rep(NA, length(unique(baseball_variables$team))) # initialize p-value vector
+effect_vector_4 <- rep(NA, length(unique(baseball_variables$team))) # initialize effect size vector 
+# this loop runs a regression on each team - every iteration corresponds to a single team
+for (i in 1:length(unique(baseball_variables$team))){
+  temporary_model <- lm(win_pct ~ diff_log, data = baseball_variables %>% filter(team == unique(baseball_variables$team)[i])) # run the regression, select only the rows that pertain to the team of interest
+  p_vector_4[i] <- summary(temporary_model)$coefficients["diff_log",4] # extract the p-value 
+  effect_vector_4[i] <- summary(temporary_model)$adj.r.squared # extract the adjusted R^2
+}
+# great! now let's create a data.frame that contains p-value, effect size, and team
+teamwise_regression_result_4 <- data.frame(team = unique(baseball_variables$team), p_value = p_vector_4, effect_size = effect_vector_4)
+# visualize results
+# create a bar plot showing each team's p-value in their regression
+p_plot_4 <- ggplot(data=teamwise_regression_result_4, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise Win Percentage ~ ∆Log Payroll Regressions p-value") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("p-value") 
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot_4 <- ggplot(data=teamwise_regression_result_4, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise Win Percentage ~ ∆Log Payroll Regressions Adj. R^2") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("Adj. R-Squared")
+
+# ----------------- #
+#    PLOTTING       #
+# ----------------- #
+
+# just for ease let's remake these plots without team names
+p_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=p_value, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regressions p-value") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("p-value") 
+# create a bar plot showing each team's adjusted r-squared value in their regression
+rsq_plot <- ggplot(data=teamwise_regression_result, aes(x=team,y=effect_size, fill=team)) + geom_bar(stat='identity') +
+  theme(axis.text.x = element_text(angle = -90)) +
+  ggtitle("Teamwise ∆Win Percentage ~ ∆Log Payroll Regressions Adj. R^2") + theme(legend.position = "none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("Adj. R-Squared")
+
+# now, we can visualize all our results and make comparisons
+gridExtra::grid.arrange(p_plot, rsq_plot, p_plot_2, rsq_plot_2, p_plot_3, rsq_plot_3, p_plot_4, rsq_plot_4, nrow=4) # plot these together
+
+```
+
+Based on the p-value and Adjusted R-Squared of our analyses:
+
+1. Change in log payroll robustly predicts change in performance for 5 teams. 
+2. Payroll robustly predicts change in performance for 1 team. 
+3. Payroll robustly predicts performance for 8 teams. 
+4. Change in log payroll robustly predicts performance for 2 teams.
+
+As we can see, it seems that change in log payroll better predicts change in win percentage, while raw payroll better predicts win percentage. So, the predictor variable we should use will depend on how we define "explaining performance". 
+
 
 
 
