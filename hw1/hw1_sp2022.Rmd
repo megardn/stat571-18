@@ -1104,7 +1104,9 @@ So, in summary, we can conclude the following: While at the aggregate level, the
 
 Which set of factors are better explaining performance? Yearly payroll or yearly increase in payroll? What criterion is being used? 
 
-The criteria we will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on each dependent variable (win percentage vs change in win percentage). We will compare how many teams achieve statistical significance and a robust effect size in each analysis.
+In order to make this comparison, we will compare the regressions we ran to test the change in log pay's predictive ability among individual teams, with regressions testing the predictive ability of raw payroll in predicting change in win percentage, as well as both payroll and change in log payroll's ability to individually predict overall win percentage This will allow us to see if one variable better explains performance as such, change in performance, or both. In all, we will compare 4 analytic setups. 
+
+The criteria we will use is the effect size (R^2) and statistical significance (p-value) of the regression of each independent variable (payroll vs change in log payroll) on change in win percentage. We will compare how many teams achieve statistical significance and a robust effect size in each analysis. 
 
 ```{r, results=TRUE, fig.height = 8, fig.width = 12}
 # ----------------- #
