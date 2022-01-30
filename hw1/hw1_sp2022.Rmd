@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr)
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr, foreign)
 ```
 
 
@@ -201,15 +201,11 @@ t
 
 ## Sample properties
 
-The population from which the sample is drawn determines where the results of our analysis can be applied or generalized. We include some basic demographic information for the purpose of identifying sample bias, if any exists. Combine our data and the general population distribution in age, gender and income to try to characterize our sample on hand.
-
-i. Does this sample appear to be a random sample from the general population of the USA?
-ii. Does this sample appear to be a random sample from the MTURK population?
-
 ### Comparison to General Population
+
 Data describing the demographics of the US general population was obtained from the 2014 American Community Survey, data available from the US Census Bureau [here](https://data.census.gov/cedsci/). 
 
-
+The distributions of age and gender in the present study sample are plotted alongside the 2014 US General population below.
 ```{r load.acs}
 #define API key for loading census data
 census_key <- "6df3ff65073680a1ec1a64376da84217f13d7a53"
@@ -227,6 +223,8 @@ usage <- usage %>% separate(label, c("gender", "age"), "!!")
 #keep only relevant age bins (>=18)
 keep<- c("18 and 19 years", "20 years", "21 years", "22 to 24 years", "25 to 29 years", "30 to 34 years", "35 to 39 years", "40 to 44 years", "45 to 49 years", "50 to 54 years", "55 to 59 years", "60 and 61 years", "62 to 64 years", "65 and 66 years", "67 to 69 years", "70 to 74 years", "75 to 79 years", "80 to 84 years", "85 years and over")
 subage <- usage[usage$age %in% keep,]
+#collapse age 20 and age 21 bins to make bin representations more meaningful/consistent
+subage$age<- fct_collapse(subage$age, "20 to 21 years"=c("20 years", "21 years"))
 subage
 
 #plot US census age and sex vs sample 
@@ -244,7 +242,9 @@ comp1 <- ggpubr::ggarrange(page1, page2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp1, top = text_grob("Age and Gender of Survey Respondents vs US General Population", 
                                color = "black", face = "bold", size = 14))
 ```
+Direct comparison is somewhat difficult as age data is reported by the ACS in uneven bins (eg. 60 and 61 yrs vs 45-49 yrs). However, it appears based on these data that study respondents tended to be younger than the general US population, with a lower proportion of respondents in middle age than would be expected from a representative sample. Gender is represented roughly evenly in both populations. 
 
+The distribution of reported educational attainment in the study sample are plotted alongside that of the 2014 US General population below.
 ``` {r load.usa}
 #load ACS data on education
 
@@ -258,8 +258,11 @@ levels(usedu$education)
 
 #keep only rows with education info and reorder factor levels
 keep2 <- c("Less than 9th grade", "9th to 12th grade, no diploma", "High school graduate (includes equivalency)", "Some college, no degree", "Associate's degree", "Bachelor's degree", "Graduate or professional degree")
-usedu$education<-factor(usedu$education, levels=keep2)
-subedu <- usedu[usedu$education %in% keep2,]
+usedu$education<-factor(usedu$education, levels=keep2) #set as factor & define levels
+subedu <- usedu[usedu$education %in% keep2,] #drop rows without education levels
+#collapse variable levels to match sample
+subedu$education<- fct_collapse(subedu$education, "Less than 12 years; no high school diploma"=c("Less than 9th grade", "9th to 12th grade, no diploma"),
+                                "Some college, no diploma; or Associate’s degree"=c("Some college, no degree", "Associate's degree"))
 #aggregate across gender and age since we just want education
 subedu <- subedu %>% group_by(education) %>% summarize(estimate=sum(estimate))
 
@@ -278,7 +281,9 @@ comp2 <- ggpubr::ggarrange(pedu1, pedu2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp2, top = text_grob("Education of Survey Respondents vs US General Population", 
                                color = "black", face = "bold", size = 14))
 ```
+Based on the data presented above, it appears that those with some college, an Associate's, and/or Bachelor's degree are overrepresented in the study sample compared to the general population. This could reflect the demographics of the MTurk workforce, which are explored below.
 
+The distribution of reported annual household income in the study sample are plotted alongside that of the 2014 US General population below.
 ``` {r load.usa}
 #load ACS data on income
 acsinc <- get_acs(geography="us", table = "B19037", year=2014, key=census_key, survey="acs1")
@@ -286,13 +291,20 @@ acsinc <- get_acs(geography="us", table = "B19037", year=2014, key=census_key, s
 #recode variable names and split out age and education
 usinc <- acsvars %>% inner_join(acsinc, by=c("name"="variable"), keep=FALSE) %>% select(label, estimate) 
 usinc$label <- gsub("Estimate!!Total!!","", as.character(usinc$label))
-usinc <- usinc %>% separate(label, c("age", "income"), "!!") %>% mutate(income=as.factor(income))
+usinc <- usinc %>% separate(label, c("age", "income"), "!!") %>% mutate(income=as.factor(income)) 
 levels(usinc$income)
 
 #keep only rows with income info and reorder factor levels
 keep3 <- c("Less than $10,000", "$10,000 to $14,999", "$15,000 to $19,999", "$20,000 to $24,999", "$25,000 to $29,999", "$30,000 to $34,999", "$35,000 to $39,999", "$40,000 to $44,999", "$50,000 to $59,999", "$60,000 to $74,999", "$75,000 to $99,999", "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $199,999", "$200,000 or more")
-usinc$income<-factor(usinc$income, levels=keep3)
-subinc <- usinc[usinc$income %in% keep3,]
+usinc$income<-factor(usinc$income, levels=keep3) #define and order levels
+subinc <- usinc[usinc$income %in% keep3,] #drop rows without income level
+#collapse variable levels to match sample
+subinc$income<- fct_collapse(subinc$income, "Less than $15,000"=c("Less than $10,000", "$10,000 to $14,999"), 
+                             "$15,000 - $30,000" =c("$15,000 to $19,999", "$20,000 to $24,999", "$25,000 to $29,999"),
+                             "$30,000 - $50,000"= c("$30,000 to $34,999", "$35,000 to $39,999", "$40,000 to $44,999"),
+                             "$50,000 - $75,000"= c("$50,000 to $59,999", "$60,000 to $74,999"),
+                             "$75,000 - $150,000"= c("$75,000 to $99,999", "$100,000 to $124,999", "$125,000 to $149,999"),
+                             "Above $150,000" = c("$150,000 to $199,999", "$200,000 or more"))
 #aggregate across age since we just want income
 subinc <- subinc %>% group_by(income) %>% summarize(estimate=sum(estimate))
 
@@ -311,20 +323,87 @@ comp3 <- ggpubr::ggarrange(pinc1, pinc2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp3, top = text_grob("Income of Survey Respondents vs US General Population", 
                                color = "black", face = "bold", size = 14))
 ```
-
+Interestingly, the most frequently reported household income in the US was higher than that of our survey respondents (\$75,000-\$150,000 in the ACS vs \$30,000-\$50,000 in the study sample). This is could reflect the comparatively larger proportion of respondents who are likely to be college students ("Some college, no diploma; or Associate’s degree") and therefore are less likely to hold high-paying, full-time jobs than the general adult population. It may also reflect the demographcis of MTurk workers, discussed below.
 
 ### Comparison to MTURK Population
-Data describing the demographics of MTURK workers in the US is from Moss et al and obtained [here](https://osf.io/w7e8p/?view_only=37f51a62db6144a2950646975887bac9). Data was collected in 2019.
 
-scales are different....
+Data describing the demographics of MTURK workers in the US is from Moss et al's [Is it Ethical to Use Mechanical Turk for Behavioral Research? Relevant Data from a Representative Survey of MTurk Participants and Wages](https://doi.org/10.31234/osf.io/jbc9d) and was obtained [here](https://osf.io/w7e8p/?view_only=37f51a62db6144a2950646975887bac9). Data was collected in 2019.
 
 ``` {r load.mturk.demo}
-mpop <- as.data.frame(read_sav("data/MTurkEthics_Study1_Data.sav")) #load mturk data
-#names(mpop)
-mpop <- mpop %>% select(age, Whatisyourgender, Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) %>% rename(gender=Whatisyourgender, education=Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, income=Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) #subset and rename columns
-mpop
+#load mturk data
+mtrk <- read.spss("data/MTurkEthics_Study1_Data.sav", use.value.labels = TRUE, to.data.frame=TRUE, add.undeclared.levels="no")
+#subset and rename columns
+mtrk <- mtrk %>% select(age, Whatisyourgender, Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) %>% rename(gender=Whatisyourgender, education=Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, income=Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi)
 ```
 
+The distributions of age and gender in the present study sample are plotted alongside the that of MTurk workers below.
+```{r mturk.age}
+#filter age to match sample
+is.na(mtrk$age) <- which(mtrk$age < 18 | mtrk$age >110)
+#drop Other gender to match sample
+is.na(mtrk$gender) <- which(mtrk$gender=="Other")
+
+#plot mturk age and sex vs sample 
+mage1 <- ggplot(samp_age, aes(x=age, fill=gender)) + 
+  geom_histogram(bins=20, color="white") +
+  labs(title="Survey respondents")
+m_age <- mtrk %>% drop_na(gender, age) #drop na before plotting
+mage2 <- ggplot(m_age, aes(x=age, fill=gender)) + 
+  geom_histogram(bins=20, color="white") +
+  labs(title="MTurk Workers", y="count")
+
+# put p1 and p2 together
+comp4 <- ggpubr::ggarrange(mage1, mage2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp4, top = text_grob("Age and Gender of Survey Respondents vs MTURK Workers", 
+                               color = "black", face = "bold", size = 14))
+```
+Overall, distributions look similar in terms of age and gender distribution. However, as with the general population, our study sample appears to have a lower proportion of mid-aged (~45 to 65 yrs) individuals than the broader MTurk sample.  
+
+The distribution of reported educational attainment in the study sample is plotted alongside highest level of education among MTurk Workers below.
+```{r mturk.education}
+#collapse variable levels to match sample
+levels(mtrk$education)
+mtrk$education<- fct_collapse(mtrk$education, "Less than 12 years; no high school diploma"=c(levels(mtrk$education)[1:8]),
+                              "Some college, no diploma; or Associate’s degree"=c(levels(mtrk$education)[10:12]),
+                              "Graduate or professional degree" =c(levels(mtrk$education)[14:16])) 
+
+#plot mturk education vs sample 
+medu1 <- ggplot(redu) + 
+  geom_bar(aes(x=education), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="Survey respondents")
+m_edu <- mtrk %>% drop_na(education) #drop na before plotting
+medu2 <- ggplot(m_edu) + 
+  geom_bar(aes(x=education), stat="count", fill="darkgreen") +
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="MTurk Workers", y="count")
+
+# put p1 and p2 together
+comp5 <- ggpubr::ggarrange(medu1, medu2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp5, top = text_grob("Education of Survey Respondents vs MTURK Workers", 
+                               color = "black", face = "bold", size = 14))
+```
+```{r mturk.income}
+#see levels
+levels(mtrk$income)
+#mturk income levels cutoff at different values from sample, not able to collapse levels to match
+
+#plot mturk income vs sample 
+minc1 <- ggplot(rinc) + 
+  geom_bar(aes(x=income), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="Survey respondents")
+m_inc <- mtrk %>% drop_na(income) #drop na before plotting
+minc2 <- ggplot(m_inc) + 
+  geom_bar(aes(x=income), stat="count", fill="darkgreen") +
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="MTurk Workers", y="count")
+
+# put p1 and p2 together
+comp6 <- ggpubr::ggarrange(minc1, minc2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp6, top = text_grob("Income of Survey Respondents vs MTURK Workers", 
+                               color = "black", face = "bold", size = 14))
+```
 ## Final estimate
 
 ``` {r siruis, echo=FALSE}
