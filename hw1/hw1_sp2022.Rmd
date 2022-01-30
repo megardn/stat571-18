@@ -30,17 +30,11 @@ knitr::opts_chunk$set(echo = FALSE, results = "hide", fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven)
+pacman::p_load(ISLR, readxl, tidyverse, magrittr, dplyr, ggplot2, haven, tidycensus, ggpubr)
 ```
 
 
 \pagebreak
-
-##  Instructions
-
-- **Submit the following files, one submission for each group:**  (1) Rmd file, (2) a compiled PDF or HTML version, and (3) all necessary data files if different from our source data. You may directly edit this .rmd file to add your answers. If you intend to work on the problems separately within your group, compile your answers into one Rmd file before submitting. We encourage that you at least attempt each problem by yourself before working with your teammates. Additionally, ensure that you can 'knit' or compile your Rmd file. It is also likely that you need to configure Rstudio to properly convert files to PDF. [**These instructions**](http://kbroman.org/knitr_knutshell/pages/latex.html#converting-knitrlatex-to-pdf) might be helpful.
-
-- In general, be as concise as possible while giving a fully complete answer to each question. All necessary datasets are available in this homework folder on Canvas. Make sure to document your code with comments (written on separate lines in a code chunk using a hashtag `#` before the comment) so the teaching fellows can follow along. R Markdown is particularly useful because it follows a 'stream of consciousness' approach: as you write code in a code chunk, make sure to explain what you are doing outside of the chunk. 
 
 # Case study 1: Audience Size
 
@@ -69,7 +63,7 @@ ii. Handling missing/wrongly filled values of the selected variables
 
 Generally, data may be wrong or incorrect if participants were confused by the instructions or inattentive to the survey.
 
-Dropping any respondents who are missing answers for listening to Sirius Radio or Wharton radio, since this data won't be usable for our analyses. Further, any subjects who reported listening to the Wharton radio show but not to Sirius Radio were excluded on the basis of input error.
+Dropping any respondents who are missing answers for listening to Sirius Radio or Wharton radio, since this data won't be usable for our analyses. Further, because the Wharton talk show is hosted on the Sirius platform, any subjects who reported listening to the Wharton radio show but not to Sirius Radio were excluded on the basis of input error.
 
 ``` {r sirius.correct}
 radio <- radio %>% drop_na(sirius) %>% drop_na(wharton) #drop any rows missing sirius/wharton listenership, since that's what we care about most
@@ -92,7 +86,7 @@ is.na(radio$age) <- which(radio$age < 18 | radio$age >110)
 ```
 
 
-Cleaning categorical variables by marking as factors and ordering levels as appropriate for inherently ranked categories (i.e. education, income)
+Cleaning categorical variables by marking as factors and ordering levels as appropriate for inherently ranked categories (i.e. education, income).
 ```{r factor.correct}
 #converting categorical data to factors:
 radio <- radio %>% mutate(gender = as.factor(gender),
@@ -131,16 +125,14 @@ Usable data was obtained from `r nrow(radio)` subjects. Of these, `r (sum(!compl
 sapply(radio, function(x) sum(!is.na(x))) 
 ```
 
-Data summary for each variable, including number of missing responses, displayed below:
+Summary statistics for each variable - including frequency of categorical responses, mean range of continuous variables, and counts for missing values - are displayed below:
 
 ``` {r summary2, echo=FALSE}
 #summary of all data
-sapply(radio, summary) 
+summary(radio)
 ```
 
-Plots!
-
-
+The distribution of respondents' ages is plotted below. Respondents ages ranged from `r min(age, na.rm=T)` to ` r max(age, na.rm=T)` years with a mean of `r mean(age, na.rm=T)` years. 
 ``` {r age.plot}
 a <- ggplot(radio, aes(x=age)) + 
   geom_histogram(bins=25, color="white", fill= "darkblue" ) +
@@ -148,6 +140,19 @@ a <- ggplot(radio, aes(x=age)) +
 a
 ```
 
+Respondents' reported educational attainment is plotted below. 
+``` {r education.plot}
+redu <- radio %>% drop_na(education) #drop missing education values prior to plotting
+
+d<- ggplot(redu) + 
+  geom_bar(aes(x=education), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  ggtitle("Reported education of survey respondents")
+d
+```
+Respondents most frequently reported having completed some college or An associate's degree (`r (sum(redu$education == "Some college, no diploma; or Associate’s degree")/nrow(redu))*100`% of `r nrow(redu)` subjects for whom education data was available).
+
+Listening habits of all survey respondents are plotted below. Most respondents reported listening to Sirius Radio stations, which may indicate that MTurk workers who listen to Sirius were more likely to opt-into completing a survey about Sirius Radio.
 ``` {r wharton.plot}
 w<- ggplot(radio, aes(x=sirius, fill=wharton)) + 
   geom_bar(stat="count") + 
@@ -158,31 +163,27 @@ w
 ```
 
 
-``` {r education.plot}
-d<- ggplot(radio) + 
-  geom_bar(aes(x=education), stat="count", fill="darkblue") + 
-  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
-  ggtitle("Reported education of survey respondents") #should i drop NA before plotting?
-d
-```
 
-Reported household income was plotted among those who do and do not listen to Wharton's radio show.
-
+Reported household income was plotted among those who do and do not listen to Wharton's radio show. Respondents most frequently reported an annual household income of \$30-$50,000. 
 ``` {r income.plot}
-i<- ggplot(radio, aes(x=income, fill=wharton)) + 
+rinc <- radio %>% drop_na(income) #drop missing income values prior to plotting
+
+i<- ggplot(rinc, aes(x=income, fill=wharton)) + 
   geom_bar(stat="count") +
   labs(title="Reported household income and listenership of survey respondents", x="Annual Household Income") + 
   guides(fill=guide_legend(title="Listen to Wharton Radio Show")) 
 i
 ```
-
-
-```{r}
+While the number of individuals in each bracket varies considerably across income levels, the count of individuals who listen to Wharton radio appears relatively stable across income brackets. We further probed the possible relationship of income and listening to Wharton's radio show by calculating the percentage of total respondents in each income bracket who report listening to Wharton radio, plotted below. The income group with the greatest percentage of Wharton radio listeners was those earning over \$150,000 per year.
+```{r listenerincome.plot, echo=FALSE}
+#count subj in each income bracket who listen to wharton
 neww <- radio %>% group_by(income, wharton) %>% count(wharton) %>% filter(wharton=="Yes")
+#count subjects in each income bracket
 newi <- radio %>% group_by(income) %>% count(income) %>% rename(total=n)
-
+#merge dataframes and calculate percentage
 newmerge <- inner_join(neww, newi, by="income") %>% mutate(prcnt=(n/total)*100)
 
+#plot
 prc<- ggplot(newmerge) + 
   geom_col(aes(x=income, y=prcnt),fill="darkblue")+
   labs(title="Percent respondents listening to Wharton radio by household income", x="Annual Household Income", y ="Percent listening to Wharton radio") +
@@ -190,7 +191,7 @@ prc<- ggplot(newmerge) +
 prc
 ```
 
-
+The distribution of the time taken by each respondents to complete the survey is plotted below. Respondents time to completion ranged from `r min(worktime, na.rm=T)` to ` r max(worktime, na.rm=T)` seconds with a mean of `r mean(worktime, na.rm=T)` seconds. 
 ``` {r worktime.plot}
 t <- ggplot(radio, aes(x=worktime)) + 
   geom_histogram(bins=25, color="white", fill= "darkgreen") + 
@@ -205,10 +206,111 @@ The population from which the sample is drawn determines where the results of ou
 i. Does this sample appear to be a random sample from the general population of the USA?
 ii. Does this sample appear to be a random sample from the MTURK population?
 
-Note: You can not provide evidence by simply looking at our data here. For example, you need to find distribution of education in our age group in US to see if the two groups match in distribution. You may need to gather some background information about the MTURK population to have a slight sense if this particular sample seem to a random sample from there... Please do not spend too much time gathering evidence. 
-
 ### Comparison to General Population
 Data describing the demographics of the US general population was obtained from the 2014 American Community Survey, data available from the US Census Bureau [here](https://data.census.gov/cedsci/). 
+
+
+```{r load.acs}
+#define API key for loading census data
+census_key <- "6df3ff65073680a1ec1a64376da84217f13d7a53"
+
+#load variable names of ACS data
+acsvars <- load_variables(2014, "acs1", cache=TRUE)
+
+#load ACS data on sex & age
+
+acsage <- get_acs(geography="us", table = "B01001", year=2014, key=census_key, survey="acs1")
+#recode variable names and split out gender
+usage <- acsvars %>% inner_join(acsage, by=c("name"="variable"), keep=FALSE) %>% select(label, estimate) 
+usage$label <- gsub("Estimate!!Total!!","", as.character(usage$label))
+usage <- usage %>% separate(label, c("gender", "age"), "!!")
+#keep only relevant age bins (>=18)
+keep<- c("18 and 19 years", "20 years", "21 years", "22 to 24 years", "25 to 29 years", "30 to 34 years", "35 to 39 years", "40 to 44 years", "45 to 49 years", "50 to 54 years", "55 to 59 years", "60 and 61 years", "62 to 64 years", "65 and 66 years", "67 to 69 years", "70 to 74 years", "75 to 79 years", "80 to 84 years", "85 years and over")
+subage <- usage[usage$age %in% keep,]
+subage
+
+#plot US census age and sex vs sample 
+samp_age <- radio %>% drop_na(gender, age) 
+page1 <- ggplot(samp_age, aes(x=age, fill=gender)) + 
+  geom_histogram(bins=20, color="white") +
+  labs(title="Survey respondents")
+page2 <- ggplot(subage, aes(x=age, y=estimate, fill=gender)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="US population", y="count")
+
+# put p1 and p2 together
+comp1 <- ggpubr::ggarrange(page1, page2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp1, top = text_grob("Age and Gender of Survey Respondents vs US General Population", 
+                               color = "black", face = "bold", size = 14))
+```
+
+``` {r load.usa}
+#load ACS data on education
+
+acsedu <- get_acs(geography="us", table = "B15001", year=2014, key=census_key, survey="acs1")
+
+#recode variable names and split out gender, age and education
+usedu <- acsvars %>% inner_join(acsedu, by=c("name"="variable"), keep=FALSE) %>% select(label, estimate) 
+usedu$label <- gsub("Estimate!!Total!!","", as.character(usedu$label))
+usedu <- usedu %>% separate(label, c("gender", "age", "education"), "!!") %>% mutate(education=as.factor(education))
+levels(usedu$education)
+
+#keep only rows with education info and reorder factor levels
+keep2 <- c("Less than 9th grade", "9th to 12th grade, no diploma", "High school graduate (includes equivalency)", "Some college, no degree", "Associate's degree", "Bachelor's degree", "Graduate or professional degree")
+usedu$education<-factor(usedu$education, levels=keep2)
+subedu <- usedu[usedu$education %in% keep2,]
+#aggregate across gender and age since we just want education
+subedu <- subedu %>% group_by(education) %>% summarize(estimate=sum(estimate))
+
+#plot US census education vs sample 
+pedu1 <- ggplot(redu) + 
+  geom_bar(aes(x=education), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="Survey respondents")
+pedu2 <- ggplot(subedu, aes(x=education, y=estimate)) + 
+  geom_bar(stat="identity", fill="darkgreen") +
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="US population", y="count")
+
+# put p1 and p2 together
+comp2 <- ggpubr::ggarrange(pedu1, pedu2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp2, top = text_grob("Education of Survey Respondents vs US General Population", 
+                               color = "black", face = "bold", size = 14))
+```
+
+``` {r load.usa}
+#load ACS data on income
+acsinc <- get_acs(geography="us", table = "B19037", year=2014, key=census_key, survey="acs1")
+
+#recode variable names and split out age and education
+usinc <- acsvars %>% inner_join(acsinc, by=c("name"="variable"), keep=FALSE) %>% select(label, estimate) 
+usinc$label <- gsub("Estimate!!Total!!","", as.character(usinc$label))
+usinc <- usinc %>% separate(label, c("age", "income"), "!!") %>% mutate(income=as.factor(income))
+levels(usinc$income)
+
+#keep only rows with income info and reorder factor levels
+keep3 <- c("Less than $10,000", "$10,000 to $14,999", "$15,000 to $19,999", "$20,000 to $24,999", "$25,000 to $29,999", "$30,000 to $34,999", "$35,000 to $39,999", "$40,000 to $44,999", "$50,000 to $59,999", "$60,000 to $74,999", "$75,000 to $99,999", "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $199,999", "$200,000 or more")
+usinc$income<-factor(usinc$income, levels=keep3)
+subinc <- usinc[usinc$income %in% keep3,]
+#aggregate across age since we just want income
+subinc <- subinc %>% group_by(income) %>% summarize(estimate=sum(estimate))
+
+#plot US census income vs sample 
+pinc1 <- ggplot(rinc) + 
+  geom_bar(aes(x=income), stat="count", fill="darkblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="Survey respondents")
+pinc2 <- ggplot(subinc, aes(x=income, y=estimate)) + 
+  geom_bar(stat="identity", fill="darkgreen") +
+  theme(axis.text.x = element_text(angle = 60, hjust=1)) + 
+  labs(title="US population", y="count")
+
+# put p1 and p2 together
+comp3 <- ggpubr::ggarrange(pinc1, pinc2, common.legend = T, legend = "bottom", ncol = 2)
+annotate_figure(p=comp3, top = text_grob("Income of Survey Respondents vs US General Population", 
+                               color = "black", face = "bold", size = 14))
+```
 
 
 ### Comparison to MTURK Population
@@ -216,7 +318,7 @@ Data describing the demographics of MTURK workers in the US is from Moss et al a
 
 scales are different....
 
-``` {r}
+``` {r load.mturk.demo}
 mpop <- as.data.frame(read_sav("data/MTurkEthics_Study1_Data.sav")) #load mturk data
 #names(mpop)
 mpop <- mpop %>% select(age, Whatisyourgender, Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) %>% rename(gender=Whatisyourgender, education=Whatisthehighestlevelofschoolyouhavecompletedorthehighestdegreey, income=Thinkingbackoverthelastyearwhatwasyourfamilysannualincomeincludi) #subset and rename columns
