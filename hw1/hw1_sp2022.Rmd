@@ -383,6 +383,9 @@ comp5 <- ggpubr::ggarrange(medu1, medu2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp5, top = text_grob("Education of Survey Respondents vs MTURK Workers", 
                                color = "black", face = "bold", size = 14))
 ```
+The educational attainment of our sample seems to be reflective of the larger MTurk workforce, with the only notable difference being an over-representation of those with some college/an Associate's degree compared to college graduates, which are about equally common among the MTurk population. This could reflect sampling effects, or potentially something about the survey's presentation on the MTurk platform was particularly appealing to the interests of current college students, making them more likely to opt-in.
+
+Finally, the distribution of reported annual household income in the study sample are plotted alongside that of MTurk workers below.
 ```{r mturk.income}
 #see levels
 levels(mtrk$income)
@@ -404,6 +407,9 @@ comp6 <- ggpubr::ggarrange(minc1, minc2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp6, top = text_grob("Income of Survey Respondents vs MTURK Workers", 
                                color = "black", face = "bold", size = 14))
 ```
+Differences in the income bins defined by the present survey and that assessing MTurk worker demographics make direct comparison difficult. However, the incomes of respondents in the Wharton survey appears more normally distributed than that of MTurk workers, who are unexpectedly overrepresented in the \$100-\$149K income bracket. Further query would need to be conducted to assess the root of this divergence, though it may be related to the somewhat greater proportion of middle-age MTurk workers as compared to the study sample.
+
+
 ## Final estimate
 
 ``` {r siruis, echo=FALSE}
@@ -421,17 +427,15 @@ The aim of the present study was to estimate the audience size of radio show Bus
 
 ## New task
 
-Now suppose you are asked to design a study to estimate the audience size of Wharton Business Radio Show as of today: You are given a budget of $1000. You need to present your findings in two months. 
+We propose the following study to estimate the audience size of the Wharton Business Radio Show today:
 
-Write a proposal for this study which includes:
+We endeavor to measure the proportion of Sirius Radio listeners who occasionally or regularly listen to the Wharton radio show. Sirius Radio is a subscription-based service, meaning that Sirius already collects contact information and data on users. Therefore we would efficiently target our survey to known Sirius Radio listeners, by purchasing $500 worth of subscribers' email addresses. Subscribers would be sampled randomly (restricted by Sirius to those who have not opted out of such communications) and sample size would be restricted by the cost of subscriber emails with a maximum of \$500. 
 
-1. Method proposed to estimate the audience size.
-2. What data should be collected and where it should be sourced from.
-Please fill in the google form to list your platform where surveys will be launched and collected [HERE](https://forms.gle/8SmjFQ1tpqr6c4sa8) 
+Subjects would be sent a survey using Qualtrics, a data collection platform free to members of the Penn Community. Subjects would be incentivized to complete the survey with a chance to win one of five \$100 Visa gift-cards.
 
-A good proposal will give an accurate estimation with the least amount of money used. 
+In the survey we would ask respondents to report whether they have ever listened to the Wharton Business Radio Show, and if so to report how regularly they listen in units of average episodes per month. By assessing how frequently individuals listen to the Wharton show we hope to build a more complete picture of the regular listening audience and compare the ratio of occasional Wharton listeners among Sirius users with those who listen frequently. We would also assess demographics (age, sex, income, education) in order to assess for any skew that may affect generalizability to Sirius listeners overall. Importantly, we would help maintain the quality of collected data by making all fields required and restricting entries in each field to  the correct data type (drop-downs, characters, or integers, as appropriate).
 
-
+Finally, we would use the proportion of Sirius listeners who report ever listening to Wharton radio multiplied by the total number of Sirius Radio subscribers to estimate audience size. We could further probe the sample by applying the proportion of respondents who frequently listen (e.g. at least 4 times per month) to Wharton radio to estimate the number of regular listeners.
 
 
 
