@@ -135,7 +135,7 @@ Summary statistics for each variable - including frequency of categorical respon
 summary(radio)
 ```
 
-The distribution of respondents' ages is plotted below. Respondents ages ranged from `r min(radio$age, na.rm=T)` to ` r max(radio$age, na.rm=T)` years with a mean of `r mean(radio$age, na.rm=T)` years. 
+The distribution of respondents' ages is plotted below. Respondents ages ranged from `r min(radio$age, na.rm=T)` to `r max(radio$age, na.rm=T)` years with a mean of `r mean(radio$age, na.rm=T)` years. 
 ``` {r age.plot}
 a <- ggplot(radio, aes(x=age)) + 
   geom_histogram(bins=25, color="white", fill= "darkblue" ) +
@@ -174,9 +174,11 @@ rinc <- radio %>% drop_na(income) #drop missing income values prior to plotting
 i<- ggplot(rinc, aes(x=income, fill=wharton)) + 
   geom_bar(stat="count") +
   labs(title="Reported household income and listenership of survey respondents", x="Annual Household Income") + 
-  guides(fill=guide_legend(title="Listen to Wharton Radio Show")) 
+  guides(fill=guide_legend(title="Listen to Wharton Radio Show")) +
+  theme(axis.text.x = element_text(angle = 60, hjust=1))
 i
 ```
+  
 While the number of individuals in each bracket varies considerably across income levels, the count of individuals who listen to Wharton radio appears relatively stable across income brackets. We further probed the possible relationship of income and listening to Wharton's radio show by calculating the percentage of total respondents in each income bracket who report listening to Wharton radio, plotted below. The income group with the greatest percentage of Wharton radio listeners was those earning over \$150,000 per year.
 ```{r listenerincome.plot, echo=FALSE}
 #count subj in each income bracket who listen to wharton
@@ -194,7 +196,7 @@ prc<- ggplot(newmerge) +
 prc
 ```
 
-The distribution of the time taken by each respondents to complete the survey is plotted below. Respondents time to completion ranged from `r min(radio$worktime, na.rm=T)` to ` r max(radio$worktime, na.rm=T)` seconds with a mean of `r mean(radio$worktime, na.rm=T)` seconds. 
+The distribution of the time taken by each respondents to complete the survey is plotted below. Respondents time to completion ranged from `r min(radio$worktime, na.rm=T)` to `r max(radio$worktime, na.rm=T)` seconds with a mean of `r mean(radio$worktime, na.rm=T)` seconds. 
 ``` {r worktime.plot}
 t <- ggplot(radio, aes(x=worktime)) + 
   geom_histogram(bins=25, color="white", fill= "darkgreen") + 
@@ -245,6 +247,7 @@ comp1 <- ggpubr::ggarrange(page1, page2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp1, top = text_grob("Age and Gender of Survey Respondents vs US General Population", 
                                color = "black", face = "bold", size = 14))
 ```
+  
 Direct comparison is somewhat difficult as age data is reported by the ACS in uneven bins (eg. 60 and 61 yrs vs 45-49 yrs). However, it appears based on these data that study respondents tended to be younger than the general US population, with a lower proportion of respondents in middle age than would be expected from a representative sample. Gender is represented roughly evenly in both populations. 
 
 The distribution of reported educational attainment in the study sample are plotted alongside that of the 2014 US General population below.
@@ -284,6 +287,7 @@ comp2 <- ggpubr::ggarrange(pedu1, pedu2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp2, top = text_grob("Education of Survey Respondents vs US General Population", 
                                color = "black", face = "bold", size = 14))
 ```
+  
 Based on the data presented above, it appears that those with some college, an Associate's, and/or Bachelor's degree are overrepresented in the study sample compared to the general population. This could reflect the demographics of the MTurk workforce, which are explored below.
 
 The distribution of reported annual household income in the study sample are plotted alongside that of the 2014 US General population below.
@@ -360,10 +364,11 @@ comp4 <- ggpubr::ggarrange(mage1, mage2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp4, top = text_grob("Age and Gender of Survey Respondents vs MTURK Workers", 
                                color = "black", face = "bold", size = 14))
 ```
+  
 Overall, distributions look similar in terms of age and gender distribution. However, as with the general population, our study sample appears to have a lower proportion of mid-aged (~45 to 65 yrs) individuals than the broader MTurk sample.  
 
 The distribution of reported educational attainment in the study sample is plotted alongside highest level of education among MTurk Workers below.
-```{r mturk.education}
+```{r mturk.education, fig.height=8}
 #collapse variable levels to match sample
 levels(mtrk$education)
 mtrk$education<- fct_collapse(mtrk$education, "Less than 12 years; no high school diploma"=c(levels(mtrk$education)[1:8]),
@@ -386,6 +391,7 @@ comp5 <- ggpubr::ggarrange(medu1, medu2, common.legend = T, legend = "bottom", n
 annotate_figure(p=comp5, top = text_grob("Education of Survey Respondents vs MTURK Workers", 
                                color = "black", face = "bold", size = 14))
 ```
+  
 The educational attainment of our sample seems to be reflective of the larger MTurk workforce, with the only notable difference being an over-representation of those with some college/an Associate's degree compared to college graduates, which are about equally common among the MTurk population. This could reflect sampling effects, or potentially something about the survey's presentation on the MTurk platform was particularly appealing to the interests of current college students, making them more likely to opt-in.
 
 Finally, the distribution of reported annual household income in the study sample are plotted alongside that of MTurk workers below.
