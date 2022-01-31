@@ -1,5 +1,5 @@
 ---
-title: " Modern Data Mining, HW 1"
+title: " Modern Data Mining, HW 1 - Group 18"
 author:
 - Joelle Bagautdinova
 - Diego G. Davila
