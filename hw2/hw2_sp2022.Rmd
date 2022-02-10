@@ -1,9 +1,9 @@
 ---
 title: "Modern Data Mining, HW 2"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Davila
+- Margaret Gardner
+- Joelle Bagautdinova
 date: 'Due: 11:59 PM,  Sunday, 02/13'
 output:
   pdf_document:
@@ -30,7 +30,8 @@ knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, tidyverse, data.table) # add the packages needed
+#if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
+pacman::p_load(ISLR, tidyverse, data.table, reshape2) # add the packages needed
 ```
 
 
@@ -134,6 +135,19 @@ The following 10 questions are answered as 1: strongly agree, 2: agree, 3: disag
 
 Load the data. Do a quick EDA to get familiar with the data set. Pay attention to the unit of each variable. Are there any missing values?
 
+Here I'll read in the data and display some rows to make sure I've got what I'm expecting
+```{r}
+esteem_data <- fread('data/NLSY79.csv') # read in the csv
+head(esteem_data, 5) # show the first 5 rows to get a sense of what we have
+```
+
+Now, let's evaluate the structure, fields, missing values, etc. 
+```{r}
+skimr::skim(esteem_data) # get some quick information about the data
+# although skimr will display any missing values, for convenience I'll use the statement below
+sprintf('There are %i missing values in the dataset', sum(is.na(esteem_data))) # report the number of missing values as a whole
+```
+
 
 ## Self esteem evaluation
 
@@ -141,9 +155,59 @@ Let concentrate on Esteem scores evaluated in 87.
 
 1. Reverse Esteem 1, 2, 4, 6, and 7 so that a higher score corresponds to higher self-esteem. (Hint: if we store the esteem data in `data.esteem`, then `data.esteem[,  c(1, 2, 4, 6, 7)]  <- 5 - data.esteem[,  c(1, 2, 4, 6, 7)]` to reverse the score.)
 
+Here I'll reverse the score on a selection of items such that higher value indicates higher self-esteem, and save the result into a new variable. This will make further analysis easier. 
+```{r}
+esteem_data_adjusted <- esteem_data
+esteem_data_adjusted[,  c(37, 38, 40, 42, 43)] <- 5 - esteem_data_adjusted[,  c(37, 38, 40, 42, 43)] # reverse score such that higher value indicates higher level of self esteem construct for these items
+```
+
 2. Write a brief summary with necessary plots about the 10 esteem measurements.
 
+In this section I'll evaluate some statistics that describe each of the 10 items, and then generate some histogram plots. First I'll start by gathering some descriptive stats.
+```{r}
+# let's report some basic stats about each item
+x <- esteem_data_adjusted[, 37:46]
+sapply(x, function(x) c( "Mean"= mean(x),
+                         "SD" = sd(x), 
+                         "Median" = median(x),
+                         "Minimum" = min(x),
+                         "Maximun" = max(x)
+                    )
+)
+```
+
+Now, I'll generate some histograms so we can have a visual representation of what each item looks like
+```{r, fig.width=6, fig.height=3}
+# Plot each item's histogram
+ggplot(gather(esteem_data_adjusted[, 37:46]), aes(value)) + 
+  geom_histogram(binwidth = 1, fill = 'seagreen4', alpha = 0.8) + 
+  facet_wrap(~key, scales = 'free_x') + 
+  ggtitle("Self-Esteem Questionnaire Itemwise Score Distributions") +
+  xlab("Score") +
+  ylab('Count') 
+
+```
+
+As we can see, items have a mean between 3 and 4, with a standard deviation between about half a point to around a quarter of a point. All items have distributions slightly or very skewed in favor of higher scores. Taken together, this information suggests that moderate-to-high self-esteem is more typical, while extremely low elf-esteem is less frequent.
+
 3. Do esteem scores all positively correlated? Report the pairwise correlation table and write a brief summary.
+
+To do this I will calculate a correlation matrix for the 10 items
+```{r}
+esteem_pairwise_corr <- cor(esteem_data_adjusted[, 37:46])  # calculate pairwise correlation matrix given the esteem measures
+esteem_pairwise_corr # let's see the matrix
+```
+
+Now, I'll plot a heatmap of the correlation matrix to get a quick visual sense of how correlated these items are
+```{r, fig.width=6, fig.height=3}
+ggplot(data = melt(esteem_pairwise_corr), aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  ggtitle('Self-Esteem_87 Items Correlation Matrix') + 
+  xlab('Item') +
+  ylab('Item') +
+  labs(fill = "Correlation") 
+```
+As we can see, while the degree to which items are correlated varies, there are no negative correlations, indicating that the items in this questionnaire are correlated to each other. 
 
 4. PCA on 10 esteem measurements. (centered but no scaling)
 
