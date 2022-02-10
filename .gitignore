@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+/hw2/data/brca*.csv
+/hw2/output
