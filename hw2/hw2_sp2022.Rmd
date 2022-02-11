@@ -29,9 +29,9 @@ urlcolor: blue
 knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
-if(!require('pacman')) {install.packages('pacman')}
+if(!require('pacman', 'factoextra', 'AMR')) {install.packages('pacman', 'factoextra', 'AMR')}
 #if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
-pacman::p_load(ISLR, tidyverse, data.table, reshape2) # add the packages needed
+pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra) # add the packages needed
 ```
 
 
@@ -207,7 +207,7 @@ ggplot(data = melt(esteem_pairwise_corr), aes(x=Var1, y=Var2, fill=value)) +
   ylab('Item') +
   labs(fill = "Correlation") 
 ```
-As we can see, while the degree to which items are correlated varies, there are no negative correlations, indicating that the items in this questionnaire are correlated to each other. 
+As we can see, while the degree to which items are correlated varies, there are no negative correlations, indicating that the items in this questionnaire are positively correlated to each other. 
 
 4. PCA on 10 esteem measurements. (centered but no scaling)
 
@@ -225,6 +225,44 @@ As we can see, while the degree to which items are correlated varies, there are 
   
     g) PC’s provide us with a low dimensional view of the self-esteem scores. Use a biplot with the first two PC's to display the data.  Give an interpretation of PC1 and PC2 from the plot. (try `ggbiplot` if you could, much prettier!)
 
+```{r, fig.width=6, fig.height=3}
+# first, for convenience, create a new table including only the items of interest
+esteem_87_measure <- esteem_data_adjusted[, 37:46]
+
+# now, we apply PCA without scaling 
+esteem_87_pca <- prcomp(esteem_87_measure, scale. = FALSE)
+
+# display the loadings
+esteem_87_pca$rotation
+
+# assess correlation between PC1 and PC2 scores
+cor(esteem_87_pca$x[,c(1,2)])
+
+# for convenience, extract the PVE and CPVE
+esteem_PVE <- data.frame(summary(esteem_87_pca)$importance[2, ])
+esteem_CPVE <- data.frame(summary(esteem_87_pca)$importance[3, ])
+
+# get a PVE plot for our principal components
+ggplot(data=esteem_PVE, aes(x = factor(1:dim(esteem_PVE)[1]), y = esteem_PVE[,1])) + 
+  geom_bar(stat="identity", fill = 'seagreen4', alpha = 0.8) +
+  xlab("Principal Componnents") +
+  ylab("Proportion of Variance Explained") +
+  ggtitle("PVE Scree Plot") +
+  scale_x_discrete(breaks = seq(1,10,by=1))
+  
+# get a cumulative PVE plot for our principal components
+ggplot(data=esteem_CPVE, aes(x = factor(1:dim(esteem_CPVE)[1]), y = esteem_CPVE[,1])) + 
+  geom_bar(stat="identity", fill = 'steelblue1', alpha = 0.8) +
+  xlab("Principal Componnents") +
+  ylab("Cummulative Proportion of Variance Explained") +
+  ggtitle("Cummulative PVE Plot") +
+  scale_x_discrete(breaks = seq(1,10,by=1))
+
+# create a biplot for our first two PCs - here I use the AMR package function ggplot_pca()
+ggplot_pca(x=esteem_87_pca, arrows_textsize = 3, arrows_colour = "red4", points_size = 1) + xlab("PC1") + ylab("PC2") + ggtitle("Biplot of first two Principal Components")
+
+```
+
 5. Apply k-means to cluster subjects on the original esteem scores
 
     a) Find a reasonable number of clusters using within sum of squared with elbow rules.
@@ -233,6 +271,28 @@ As we can see, while the degree to which items are correlated varies, there are 
     
     c) Can you visualize the clusters with somewhat clear boundaries? You may try different pairs of variables and different PC pairs of the esteem scores.
 
+```{r, fig.width=6, fig.height=3}
+# determine optimal number of clusters
+fviz_nbclust(esteem_87_measure, kmeans, method = "wss")
+num_clusters = 3 # based on elbow method 
+
+esteem_87_clust <- kmeans(esteem_87_measure, centers = num_clusters) # cluster into 3 groups
+
+# to evaluate, let's add cluster as a variable
+esteem_raw_clust <- esteem_87_measure
+esteem_raw_clust$cluster <- factor(esteem_87_clust$cluster)
+esteem_pca_clust <- esteem_87_pca
+esteem_pca_clust$cluster <- factor(esteem_87_clust$cluster)
+
+# Visualize clusters
+
+# Plotting by the first two PCs
+ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw_clust$cluster)) + 
+  geom_point() +
+  ggtitle("Clusters by PC1 & PC2 Scores")
+
+
+```
 
 6. We now try to find out what factors are related to self-esteem? PC1 of all the Esteem scores is a good variable to summarize one's esteem scores. We take PC1 as our response variable. 
 
