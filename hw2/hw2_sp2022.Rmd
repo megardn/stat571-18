@@ -29,9 +29,9 @@ urlcolor: blue
 knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
-if(!require('pacman', 'factoextra', 'AMR')) {install.packages('pacman', 'factoextra', 'AMR')}
+if(!require('pacman', 'factoextra', 'AMR', 'stargazer')) {install.packages('pacman', 'factoextra', 'AMR', 'stargazer')}
 #if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
-pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra) # add the packages needed
+pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra, stargazer) # add the packages needed
 ```
 
 
@@ -310,6 +310,68 @@ ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw
         
       - Write a summary of your findings. In particular, explain what and how the variables in the model affect one's self-esteem. 
         
+prepare the model
+```{r}
+# ok, we'll be building a data.frame that contains potential explanatory factors. initialize from our response variable
+selfEsteem_model <- data.frame(esteem_87_pca$x[,1])
+names(selfEsteem_model) <- "self_esteem"
+# add personal information factors
+selfEsteem_model$gender <- factor(esteem_data$Gender) # gender as factor
+selfEsteem_model$eventual_education <- esteem_data$Education05 
+selfEsteem_model$log_income <- log(esteem_data$Income87 + (abs(min(esteem_data$Income87)) + 0.1)) # log of income, adding a small amount to mitigate NaNs
+selfEsteem_model$job <- factor(esteem_data$Job05)
+# add household environment factors
+selfEsteem_model$magazine <- factor(esteem_data$Imagazine)
+selfEsteem_model$newspaper <- factor(esteem_data$Inewspaper)
+selfEsteem_model$library <- factor(esteem_data$Ilibrary)
+selfEsteem_model$motherEd <- esteem_data$MotherEd
+selfEsteem_model$fatherEd <- esteem_data$FatherEd
+selfEsteem_model$famIncome <- log(esteem_data$FamilyIncome78 + (abs(min(esteem_data$FamilyIncome78)) + 0.1))
+# intelligence proxy (PC1 of SVAB)
+svab_pca <- prcomp(esteem_data[,16:25], scale. = TRUE) # apply PCA to SVAB
+selfEsteem_model$intelligence <- svab_pca$x[,1]
+```
+
+run different regression models
+```{r}
+# are there gender differences in self esteem as measured by the questionnaire?
+gender_diff <- aov(self_esteem ~ gender, data=selfEsteem_model)
+summary(gender_diff)
+
+# this model will test the hypothesis that family SES during development mediates eventual self-esteem
+family_SES_model <- lm(self_esteem ~ motherEd + fatherEd + famIncome + gender, data = selfEsteem_model)
+summary(family_SES_model)
+FamSES_fdr_p <- p.adjust(p = summary(family_SES_model)$coefficients[,4], method = "BH", n = length(summary(family_SES_model)$coefficients[,4]))
+FamSES_fdr_p
+
+# this model will test the hypothesis that household media habits mediate self esteem
+household_media_model <- lm(self_esteem ~ magazine + newspaper + library + gender, data = selfEsteem_model)
+summary(household_media_model)
+HouseMEdia_fdr_p <- p.adjust(p = summary(household_media_model)$coefficients[,4], method = "BH", n = length(summary(household_media_model)$coefficients[,4]))
+HouseMEdia_fdr_p
+
+# this model will test the hypothesis that intelligence and income (two highly related variables in the literature) mediate self-esteem
+intelligence_income_gender_model <- lm(self_esteem ~ intelligence + log_income + gender, data = selfEsteem_model)
+summary(intelligence_income_gender_model)
+# let's see if we can reasonably remove the gender variable by conducting an F test
+intelligence_income_model <- lm(self_esteem ~ intelligence + log_income, data = selfEsteem_model) # reduced model
+anova(intelligence_income_model, intelligence_income_gender_model) # run test 
+# since we cannot reject the null, we will stick with the model that doesn't include gender
+summary(intelligence_income_model)
+IntelIncome_fdr_p <- p.adjust(p = summary(intelligence_income_model)$coefficients[,4], method = "BH", n = length(summary(intelligence_income_model)$coefficients[,4]))
+IntelIncome_fdr_p
+
+stargazer(family_SES_model, intelligence_income_model, household_media_model, type = 'latex', 
+                     keep.stat = c("n", "rsq", "sigma2", "ser"))
+```
+
+model diagnostics
+```{r}
+plot(intelligence_income_model, 1, pch=16) # residual, check linearity
+abline(h=0, col="blue", lwd=2)
+plot(intelligence_income_model, 2) # qq, check normality
+plot(intelligence_income_model, 3) # scale-location, check homoscedasticity
+```
 
 
 # Case study 2: Breast cancer sub-type
