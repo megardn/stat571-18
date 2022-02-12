@@ -281,17 +281,24 @@ esteem_87_clust <- kmeans(esteem_87_measure, centers = num_clusters) # cluster i
 # to evaluate, let's add cluster as a variable
 esteem_raw_clust <- esteem_87_measure
 esteem_raw_clust$cluster <- factor(esteem_87_clust$cluster)
-esteem_pca_clust <- esteem_87_pca
-esteem_pca_clust$cluster <- factor(esteem_87_clust$cluster)
+
+# get at some cluster differences
+cluster_avg_scores <- esteem_raw_clust %>%
+  group_by(cluster) %>%
+  summarise_at(vars(c(1:10)), mean) %>%
+  data.frame()
+ggplot(data = melt(cluster_avg_scores), aes(x = variable, y = value, group = cluster, col = cluster)) + 
+  geom_line() + 
+  geom_point() +
+  ggtitle("Common Cluster Features") +
+  ylab("Cluster Avg. Score") +
+  xlab("Item")
 
 # Visualize clusters
-
 # Plotting by the first two PCs
 ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw_clust$cluster)) + 
   geom_point() +
   ggtitle("Clusters by PC1 & PC2 Scores")
-
-
 ```
 
 6. We now try to find out what factors are related to self-esteem? PC1 of all the Esteem scores is a good variable to summarize one's esteem scores. We take PC1 as our response variable. 
