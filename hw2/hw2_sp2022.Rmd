@@ -6,10 +6,6 @@ author:
 - Joelle Bagautdinova
 date: 'Due: 11:59 PM,  Sunday, 02/13'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: show
     highlight: haddock
@@ -18,6 +14,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -29,9 +29,19 @@ urlcolor: blue
 knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
-if(!require('pacman', 'factoextra', 'AMR')) {install.packages('pacman', 'factoextra', 'AMR')}
-#if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
-pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra) # add the packages needed
+# if(!require('pacman', 'factoextra', 'AMR')) {
+#   install.packages('pacman', 'factoextra', 'AMR')
+# } # Joelle: this isn't working for me :/
+# if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
+
+if(!require('pacman')) {
+  install.packages('pacman')
+}
+output_format <- ifelse(is.null(knitr::opts_knit$get("rmarkdown.pandoc.to")),
+                        "text", knitr::opts_knit$get("rmarkdown.pandoc.to"))
+
+pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra, GGally, stargazer) # add the packages needed
+
 ```
 
 
@@ -378,16 +388,168 @@ Get familiar with this dataset first. Tip: you can use the command `?ISLR::Auto`
 ## EDA
 Explore the data, with particular focus on pairwise plots and summary statistics. Briefly summarize your findings and any peculiarities in the data.
 
+```{r}
+# exploring numerical descriptive summaries
+auto_df <- Auto
+# str(auto_df)
+# summary(auto_df)
+
+# changing origin variable to factor and rename factor levels
+auto_df <- auto_df %>% 
+  mutate(origin = as.factor(origin)) %>% 
+  mutate(origin = recode_factor(origin, "1" = "American", 
+                                "2" = "European",
+                                "3" = "Japanese"))
+
+
+# providing data summary now that the origin variable has been renamed
+head(auto_df)
+str(auto_df)
+summary(auto_df)
+
+# checking for NAs... There are none
+# apply(is.na(Auto), 2, which)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+
+# providing more elaborate summary statistics of numerical variables by origin
+agg <- auto_df %>% 
+  group_by(origin) %>% 
+  summarise(
+    n_cars = length(origin),
+    min_mpg = min(mpg), max_mpg = max(mpg), mean_mpg = mean(mpg), sd_mpg = sd(mpg),
+    min_cyl = min(cylinders), max_cyl = max(cylinders), mean_cyl = mean(cylinders), sd_cyl = sd(cylinders),
+    min_disp = min(displacement), max_disp = max(displacement), mean_disp = mean(displacement), sd_disp = sd(displacement),
+    min_power = min(horsepower), max_power = max(horsepower), mean_power = mean(horsepower), sd_power = sd(horsepower),
+    min_weight = min(weight), max_weight = max(weight), mean_weight = mean(weight), sd_weight = sd(weight),
+    min_acc = min(acceleration), max_acc = max(acceleration), mean_acc = mean(acceleration), sd_acc = sd(acceleration),
+    min_year = min(year), max_year = max(year), mean_year = mean(year), sd_year = sd(year),
+    )
+
+agg2 <- data.frame(t(agg[-1]))
+colnames(agg2) <- c("American", "European", "Japanese")
+
+agg2
+
+```
+
+Based on our numerical summary by origin, we note that: 
+
+* The dataset reports on a much larger number of American cars (n = 245) compared to European (n = 68) or Japanese cars (n = 79
+* Japanese cars appear to reach (both max and on average) the largest number of miles per gallon (`mpg`)
+* American cars have more `cylinders` on average (mean = 6.3) compared to European (mean = 4.16) and Japanese cars (mean = 4.1)
+* Engine `displacement` is much larger in American cars (mean = 248, max = 455) compared to European (mean = 110, max = 183) and Japanese cars (mean = 168, max = 103)
+* American cars appear more powerful on average (mean = 119) compared to European (mean = 80.6) or Japanese cars (mean = 79.8)
+* American cars appear heavier on average (mean = 3372 lbs) compared to European (mean = 2433 lbs) or Japanese cars (mean = 2221 lbs)
+* Acceleration capacity is roughly similar in all three car origin types
+* Information is reported for cars made between 1970-1982, so these are relatively old cars
+
+Let's now view some exploratory plots: 
+
+```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=8}
+
+# create pairwise plots using the GGally package
+auto_df %>% 
+  select(-c(name)) %>%
+  ggpairs(aes(color = origin))
+
+```
+
+  
+Based on these pairwise plots, we note that: 
+
+* MPG is strongly negatively correlated with the number of cylinders, engine displacement, horsepower, and weight. These relationships appear non-linear for displacement, horsepower and weight. 
+* MPG shows moderately positive correlations with acceleration and year. These may be linear or non-linear. 
+* American cars have on average a lower MPG, much larger number of cylinders, larger displacement, horsepower and weight. 
+* Japanese cars are on average more recent than European and American cars. 
+* Cylinders, displacement, horsepower, weight and acceleration are correlated between each other. 
+* Year shows interesting trends: 
+  + 5 cylinder cars appeared in the 80s
+  + While displacement, horsepower and weight remained mostly similar over time in European and Japanese cars, these metrics have decreased over time in American cars (where cars in the 70s used to have much larger displacement, horse power and weight compared to the 80s).
+* American cars are much more represented in the sample (larger N) compared to European and Japanese cars. 
+  
 
 ## What effect does `time` have on `MPG`?
 
 a) Start with a simple regression of `mpg` vs. `year` and report R's `summary` output. Is `year` a significant variable at the .05 level? State what effect `year` has on `mpg`, if any, according to this model. 
 
+```{r}
+# building a linear model with mpg ~ year
+m1 <- summary(lm(data = auto_df, mpg ~ year))
+m1
+
+ggplot(auto_df, aes(x = year, y = mpg)) + 
+  geom_point(color = "seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  labs(title = "Effect of year on MPG") +
+  theme(plot.title = element_text(size = 20)) +
+  theme_bw()
+```
+
+Year has a significant effect on MPG (p = `r m1$coefficients[2,4]`. Specifically, increasing year by 1 unit will lead to an increase of `r m1$coefficients[2,1]` in MPG. 
+
 b) Add `horsepower` on top of the variable `year` to your linear model. Is `year` still a significant variable at the .05 level? Give a precise interpretation of the `year`'s effect found here. 
 
-c) The two 95% CI's for the coefficient of year differ among (i) and (ii). How would you explain the difference to a non-statistician?
+```{r}
+# adding horsepower to the model
+m2 <- summary(lm(data = auto_df, mpg ~ year + horsepower))
+m2
+
+```
+
+Year still has a significant effect on MPG (p = `r m2$coefficients[2,4]`) when adding horsepower to the model. Specifically, in this model, increasing year by 1 unit while keeping horsepower constant will lead to an increase of `r m2$coefficients[2,1]` in MPG. On the other hand, increasing horsepower by 1 unit while keeping year constant will lead to a `r m2$coefficients[3,1]` decrease in MPG.  
+
+
+c) The two 95% CI's for the coefficient of year differ among (i) and (ii). How would you explain the difference to a non-statistician?  
+
+A 95% confidence interval for a given $\beta_i$ coefficient is defined as: 
+
+$$\hat \beta_i \pm t^*_{.025} \text{se}(\hat \beta_i).$$
+We also know that  $t^*_{.025}$ is approximately equal to $1.96$ for a data with a large number of observations such as here. Thus, let's now compute the confidence interval for models (i) and (ii): 
+
+```{r}
+# model (i) confidence interval
+m1_conf <- 1.96 * m1$coefficients[2,2]
+
+# model (ii) confidence interval
+m2_conf <- 1.96 * m2$coefficients[2,2]
+
+# creating table with lower and upper confidence intervals
+conf_table <- rbind(c("lower" = m1$coefficients[2,1] - m1_conf, "upper" = m1$coefficients[2,1] + m1_conf),
+                    c("lower" = m2$coefficients[2,1] - m2_conf, "upper" = m2$coefficients[2,1] + m2_conf))
+
+rownames(conf_table) <- c("Model (i)","Model (ii)")
+conf_table <- as.table(conf_table)
+conf_table
+
+```
+  
+We can see that the 95% confidence interval is indeed reduced for model (ii). In layman terms, the main difference between these two models is that an additional variable has been added in model (ii) (i.e., horsepower). Whenever a variable is included, it adds new information to help explain the data, and this information will therefore lead to a more accurate estimation of the linear fit. A confidence interval can be understood as the "level of uncertainty": the smaller it is, the more certain we are about our estimation of the regression line. Thus, it makes sense that when adding more variables to a model, the estimation becomes more accurate, and the confidence interval will automatically become narrower.  
+
 
 d) Create a model with interaction by fitting `lm(mpg ~ year * horsepower)`. Is the interaction effect significant at .05 level? Explain the year effect (if any). 
+
+```{r}
+# adding horsepower to the model
+m3 <- summary(lm(data = auto_df, mpg ~ year * horsepower))
+m3
+
+# plotting the interaction model
+ggplot(auto_df, aes(x = horsepower, y = mpg, color = year)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  labs(title = "Interaction effect of horsepower and year on MPG") +
+  theme(plot.title = element_text(size = 20)) +
+  theme_bw()
+
+```
+
+Yes, the interaction effect between year and horsepower is significant (p = `r m3$coefficients[4,4]`). In this model, year has both a main effect and an interaction effect:
+
+* Main effect: increasing year by 1 unit will lead to a `r m3$coefficients[2,1]` increase in MPG
+* Interaction effect: year appears to have a different effect on MPG depending on the horsepower. Based on the plot above, we can observe that cars produced in the late 70s - early 80s (lighter blue) have both higher horsepower and higher MPG, meaning that they are more powerful and efficient. On the other hand, cars from the early 70s (dark blue) have smaller horsepower and MPG, indicating that they are less powerful and less efficient. This observation makes sense, given that technological progress made over time has logically led to more powerful and more efficient cars.  
 
 ## Categorical predictors
 
@@ -395,23 +557,302 @@ Remember that the same variable can play different roles! Take a quick look at t
 
 a) Fit a model that treats `cylinders` as a continuous/numeric variable. Is `cylinders` significant at the 0.01 level? What effect does `cylinders` play in this model?
 
+```{r}
+# linear model with cylinder as a continuous variable
+m4 <- summary(lm(data = auto_df, mpg ~ cylinders))
+m4
+
+# plotting the cylinders model
+ggplot(auto_df, aes(x = cylinders, y = mpg)) + 
+  geom_point(color="seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  labs(title = "Effect of cylinders (continuous) on MPG") +
+  theme(plot.title = element_text(size = 20)) +
+  theme_bw()
+
+```
+
+The number of cylinders has a significant effect on MPG (p = `r m4$coefficients[2,4]`) at the 0.01 level. Increasing the number of cylinders y 1 unit leads to a `r m4$coefficients[2,1]` decrease in MPG. 
+
+
 b) Fit a model that treats `cylinders` as a categorical/factor. Is `cylinders` significant at the .01 level? What is the effect of `cylinders` in this model? Describe the `cylinders` effect over `mpg`. 
+
+```{r}
+# transform cylinders into categorical variable
+auto_df <- auto_df %>% 
+  mutate(cylinders_fact = as.factor(cylinders))
+
+# checking transformation
+# str(auto_df)
+# levels(auto_df$cylinders_fact) # levels vary between 3-8. There are no 7 cylinder cars.
+
+# running linear model with cylinders as factor
+m5 <- summary(lm(data = auto_df, mpg ~ cylinders_fact))
+m5
+
+# running linear model with cylinders as factor
+m6 <- summary(lm(data = auto_df, mpg ~ 0 + cylinders_fact))
+m6
+
+```
+
+When treating the number of cylinders as a categorical variable, we can observe a differential impact of different numbers of cylinders on MPG. Specifically, it appears that having 5, 6 or 8 cylinders does not have a significant impact on MPG, whereas having 3 or 4 cylinders significantly impacts MPG at the 0.01 significance level. More specifically, cars with 3 cylinders are predicted to have a mean MPG of `r m5$coefficients[1,1]`, while cars with 4 cylinders will have a mean MPG of `r m6$coefficients[2,1]`, which is `r m5$coefficients[2,1]` MPG more. Of note, results differ when considering the `mpg ~ cylinders_fact` vs the `mpg ~ 0 + cylinders_fact`, as the first model reports the *difference* between cylinders groups compared to a reference group, i.e. 3 cylinders. In the second model, we estimate the mean in each cylinder level, and results show that all cylinder groups have a significant effect on MPG. 
+
+```{r}
+# plotting the cylinders (categorical) model
+ggplot(auto_df, aes(x = cylinders_fact, y = mpg, color = cylinders_fact)) + 
+  geom_boxplot() +
+  geom_jitter(size = 1, alpha = 0.9) +
+  geom_smooth(method = "lm", color = "darkgray") + 
+  labs(title = "Effect of cylinders (categorical) on MPG") +
+  theme(plot.title = element_text(size = 20)) +
+  theme_bw()
+
+```
+  
+The plot reveals that very few cars in this dataset have 3 or 5 cylinders compared to the other groups (4, 6 and 8 cylinders), which contain the vast majority of data points. Thus, let's rerun the same analysis after removing the 3 and 5 cylinder categories:
+
+```{r}
+# remove 3 and 5 cylinder levels
+auto_df_sub <- auto_df %>% 
+  filter(!grepl('3|5', cylinders_fact))
+
+# running linear model with cylinders as factor
+m7 <- summary(lm(data = auto_df_sub, mpg ~ cylinders_fact))
+m7
+
+# plotting the cylinders (categorical) model
+ggplot(auto_df_sub, aes(x = cylinders_fact, y = mpg, color = cylinders_fact)) + 
+  geom_boxplot() +
+  geom_jitter(size = 1, alpha = 0.9) +
+  geom_smooth(method = "lm", color = "darkgray") + 
+  labs(title = "Effect of cylinders (categorical) on MPG") +
+  theme(plot.title = element_text(size = 20)) +
+  theme_bw()
+
+```
+
+  
+Now, all three cylinder groups have a significant effect on MPG. As can be expected, cars with 4 cylinders have the best MPG, cars with 6 cylinders have an intermediate efficiency and cars with 8 cylinders have the lowest efficiency.  
+
 
 c) What are the fundamental differences between treating `cylinders` as a continuous and categorical variable in your models? 
 
+The fundamental difference is that when cylinders is treated as a continuous variable, this assumes a linear relationship between cylinders and MPG, without breaking it down by levels. By contrast, a model including cylinders as a continuous variable assesses the effect of each level (i.e., number of cylinders) on MPG separately and a linear relationship is not enforced on the data. In doing so, we can obtain a more specific estimate of the difference in MPG across cylinder groups.   
+
 d) Can you test the null hypothesis: fit0: `mpg` is linear in `cylinders` vs. fit1: `mpg` relates to `cylinders` as a categorical variable at .01 level?  
+
+To address this question, we need to perform an F-test using `anova()`, which determines the difference between a null hypothesis model (fit0: `mpg` is linear in `cylinders`) and an alternative hypothesis model (fit1: `mpg` relates to `cylinders` as a categorical variable). We are applying this test on a subset that only includes well represented cylinder groups (4,6,8).  
+
+```{r}
+
+# fit0: cylinders as a continouus variables
+fit0 <- lm(data = auto_df_sub, mpg ~ cylinders)
+
+# fit1: cylinders as a categorical variable
+fit1 <- lm(data = auto_df_sub, mpg ~ cylinders_fact)
+
+# testing the difference between fit0 and fit1
+anova_cyl <- anova(fit0, fit1)
+anova_cyl
+pval <- anova_cyl$`Pr(>F)`[2]
+
+```
+
+  
+Given that p = `r pval`, we can reject the null hypothesis that `cylinders` as a continuous variable has a linear effect on MPG.    
 
 
 ## Results
 
 Final modeling question: we want to explore the effects of each feature as best as possible. You may explore interactions, feature transformations, higher order terms, or other strategies within reason. The model(s) should be as parsimonious (simple) as possible unless the gain in accuracy is significant from your point of view.
+
+
   
+### Basic (full) model
+
+Let's start by building a full model including all features of potential interest to us in predicting `MPG`. We will directly include `cylinders` (with well-represented cylinder groups, i.e. 4,6 and 8 cylinders) as a categorical variable, as we determined that this variable is significantly better at explaining `MPG`. We will not consider the `name` variable in building our model, as this variable contains over 300 levels specifying a combination of make and model and thus will not be a very relevant variable. Finally, we will not include `acceleration` as per indications on Piazza.  
+
+```{r}
+# prepare dataframe containing only features of interest
+auto_df2 <- select(auto_df_sub, -cylinders, -name, -acceleration)
+
+# full model 
+m_basic <- lm(data = auto_df2, mpg ~ .)
+summary(m_basic)
+tmp <- summary(m_basic)
+```
+ 
+Based on this initial full model, we can see that at the 0.05 significance level, all variables appear to have a significant effect on MPG the 8 cylinders level (p = `r tmp$coefficients[9,4]`). 
+
+### Exploring interactions
+```{r}
+
+# full model with interactions
+m_int <- lm(data = auto_df2, mpg ~ (.)^2)
+summary(m_int)
+tmp <- summary(m_int)
+```
+  
+While the "goodness of fit" explains a large portion of the variance (R squared = `r tmp$r.squared`), the effect of most variables became non-significant and the interpretation of the effects has become very challenging. Thus, to optimize interpretability, we will restrict our investigation to models including main effects.  
+
+
+### Exploring non-linear relationships 
+
+Let's now consider the relationships of continuous independent variables with MPG. 
+
+
+```{r, fig.width=8, fig.height=8}
+# plotting displacement and MPG with both a linear and a quadratic fit
+p1 <- ggplot(auto_df, aes(x = displacement, y = mpg)) + 
+  geom_point(color="seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1) +
+  labs(title = "Relationship between displacement and MPG") +
+  # theme(plot.title = element_text(size = 15)) +
+  theme_bw()
+
+  
+# plotting horsepower and MPG with both a linear and a quadratic fit
+p2 <- ggplot(auto_df, aes(x = horsepower, y = mpg)) + 
+  geom_point(color="seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1) +
+  labs(title = "Relationship between horsepower and MPG") +
+  # theme(plot.title = element_text(size = 15)) +
+  theme_bw()
+  
+# plotting the weight and MPG with both a linear and a quadratic fit
+p3 <- ggplot(auto_df, aes(x = weight, y = mpg)) + 
+  geom_point(color="seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1) +
+  labs(title = "Relationship between weight and MPG") +
+  # theme(plot.title = element_text(size = 15)) +
+  theme_bw()
+
+# plotting the year with a linear fit
+p4 <- ggplot(auto_df, aes(x = year, y = mpg)) + 
+  geom_point(color="seagreen4") + 
+  geom_smooth(method = "lm", color = "darkgray") + 
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1) +
+  labs(title = "Relationship between year and MPG") +
+  # theme(plot.title = element_text(size = 15)) +
+  theme_bw()
+  
+ggpubr::ggarrange(p1, p2, p3, p4, nrow = 2, ncol = 2)
+
+```
+  
+Based on the plots above, it appears that while year shows a linear relationship with MPG, displacement, weight and horsepower may have non-linear relationships with MPG. Based on this observation, we will add quadratic terms to our model for displacement, weight and horsepower.  
+
+```{r}
+
+# creating quadratic terms
+auto_df2$displacement2 <- auto_df2$displacement^2
+auto_df2$horsepower2 <- auto_df2$horsepower^2
+auto_df2$weight2 <- auto_df2$weight^2
+
+# fitting a model that includes quadratic terms
+m_quad <- lm(data = auto_df2, mpg ~ .)
+summary(m_quad)
+
+```
+
+In this model, the linear terms of horsepower, weight and year are significant at the 0.05 level, as well as the quadratic term of weight and horsepower. Let's now run an F-test to determine whether this model is a significantly better fit:
+
+```{r}
+# testing the difference between a model with only linear terms and a model with quadratic terms
+anova_quad <- anova(m_basic, m_quad)
+anova_quad
+pval <- anova_quad$`Pr(>F)`
+
+```
+
+Given that p = `r pval`, we can reject the null hypothesis that variables *only* have a linear effect on MPG. Adding quadratic terms (model 2) leads to a significantly better fit.  
+
+
+### Improving model parsimony
+
+As a number of variables in the model above were not significantly affecting MPG, we will try removing them from the model and assess the difference between the full and reduced models with an F-test. 
+
+```{r}
+# fitting a model that includes quadratic terms
+m_quad_red <- lm(data = auto_df2, mpg ~ year + horsepower + horsepower2 + origin + weight + weight2)
+summary(m_quad_red)
+
+# testing the difference between the full quadratic model and the reduced model
+anova_quad_red <- anova(m_quad_red, m_quad)
+anova_quad_red
+pval <- anova_quad_red$`Pr(>F)`
+
+```
+
+Given that p = `r pval`, we cannot reject the null hypothesis that the reduced model is sufficient in explaining the data. In other words, the full model including all quadratic terms does not significantly improve the fit. We will thus stick to this reduced model.    
+
+
+
 a) Describe the final model. Include diagnostic plots with particular focus on the model residuals and diagnoses.
+
+Here, we provide an overview of the main models we have considered in our selection procedure:  
+
+```{r results='asis'}
+
+stargazer(m_basic, m_quad, m_quad_red, type = output_format ) 
+
+```
+
+Model 3 appears to be both the best fit and the most parsimonious, which is why we consider this as our final model.  
+
+Let's run some diagnostics on the final model to check that the model assumptions are met:  
+
+
+```{r}
+
+# generating diagnostic plots
+par(mfrow = c(1,2), mar = c(5,2,4,2), mgp = c(3,0.5,0)) # plot(fit3) produces several plots
+plot(m_quad_red, 1, pch = 16) # residual plot
+abline(h = 0, col = "blue", lwd = 2)
+plot(m_quad_red, 2) # qqplot
+
+```
+
+  
+Overall, the model appears to respect the assumptions of linearity, homoscedasticity and normal distribution.  
 
 b) Summarize the effects found.
 
+
+The final model includes the following effects:  
+
+$$\hat{y} = 2.79 +  0.125 \times horsepower  -0.016 \times weight + 0.781 \times year + 1.120 \times originEuropean + 1.5 \times originJapanese + 0.0004 \times horsepower^2 + 0 \times weight^2 $$
+
 c) Predict the `mpg` of the following car: A red car built in the US in 1983 that is 180 inches long, has eight cylinders, displaces 350 cu. inches, weighs 4000 pounds, and has a horsepower of 260. Also give a 95% CI for your prediction.
 
+```{r}
+
+# creating a newcar dataframe with the same format as the auto dataframe
+newcar <-  auto_df2[1, ] 
+newcar["mpg"] <- "NA"
+newcar["origin"] <- "American"
+newcar["year"] <- 83
+newcar["cylinders"] <- 8
+newcar["displacement"] <- 350
+newcar["displacement2"] <- 350^2
+newcar["weight"] <- 4000
+newcar["weight2"] <- 4000^2
+newcar["horsepower"] <- 260
+newcar["horsepower2"] <- 260^2
+
+# prediction for the new car
+predict(m_quad_red, newcar, interval = "confidence", se.fit = TRUE) 
+
+```
+
+  
+The model predicts that for this car, the MPG will be 26, with a confidence interval of ± 3.5 (lower = 22.4, upper = 29.5). The prediction can be described as follows:  
+
+$$\hat{y} = 2.79 +  0.125 \times 260  -0.016 \times 4000 + 0.781 \times 83 + 1.120 \times 0 + 1.5 \times + 0.0004 \times 260^2 + 0 \times 4000^2 = 26 MPG $$
 
 # Simple Regression through simulations (option)
     
