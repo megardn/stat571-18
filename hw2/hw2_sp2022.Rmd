@@ -141,7 +141,7 @@ esteem_data <- fread('data/NLSY79.csv') # read in the csv
 head(esteem_data, 5) # show the first 5 rows to get a sense of what we have
 ```
 
-Now, let's evaluate the structure, fields, missing values, etc. 
+Now, let's evaluate the structure, fields, missing values, etc. Here I'll use skimr to get a good sense as to what the data looks like, how it's distributed, and see if there are any missing values. I've also included a small line of code jsut reporting missing values (none). 
 ```{r}
 skimr::skim(esteem_data) # get some quick information about the data
 # although skimr will display any missing values, for convenience I'll use the statement below
@@ -176,7 +176,7 @@ sapply(x, function(x) c( "Mean"= mean(x),
 )
 ```
 
-Now, I'll generate some histograms so we can have a visual representation of what each item looks like
+Now, I'll generate some histograms so we can have a visual representation of what each item looks like.
 ```{r, fig.width=6, fig.height=3}
 # Plot each item's histogram
 ggplot(gather(esteem_data_adjusted[, 37:46]), aes(value)) + 
@@ -188,17 +188,17 @@ ggplot(gather(esteem_data_adjusted[, 37:46]), aes(value)) +
 
 ```
 
-As we can see, items have a mean between 3 and 4, with a standard deviation between about half a point to around a quarter of a point. All items have distributions slightly or very skewed in favor of higher scores. Taken together, this information suggests that moderate-to-high self-esteem is more typical, while extremely low elf-esteem is less frequent.
+As we can see, items generally have a mean somewhere between 3 and 4, with a standard deviation between about half a point to around a quarter of a point. All items have distributions slightly or very skewed in favor of higher scores. Taken together, this information suggests that moderate-to-high self-esteem is more typical, while extremely low elf-esteem is less frequent. 
 
 3. Do esteem scores all positively correlated? Report the pairwise correlation table and write a brief summary.
 
-To do this I will calculate a correlation matrix for the 10 items
+To do this I will calculate a correlation matrix for the 10 items. 
 ```{r}
 esteem_pairwise_corr <- cor(esteem_data_adjusted[, 37:46])  # calculate pairwise correlation matrix given the esteem measures
 esteem_pairwise_corr # let's see the matrix
 ```
 
-Now, I'll plot a heatmap of the correlation matrix to get a quick visual sense of how correlated these items are
+Now, I'll plot a heatmap of the correlation matrix to get a quick visual sense of how correlated these items are. 
 ```{r, fig.width=6, fig.height=3}
 ggplot(data = melt(esteem_pairwise_corr), aes(x=Var1, y=Var2, fill=value)) + 
   geom_tile() +
@@ -207,7 +207,7 @@ ggplot(data = melt(esteem_pairwise_corr), aes(x=Var1, y=Var2, fill=value)) +
   ylab('Item') +
   labs(fill = "Correlation") 
 ```
-As we can see, while the degree to which items are correlated varies, there are no negative correlations, indicating that the items in this questionnaire are positively correlated to each other. 
+As we can see, while the degree to which items are correlated varies, there are no negative correlations, indicating that the items in this questionnaire are indeed positively correlated to each other. 
 
 4. PCA on 10 esteem measurements. (centered but no scaling)
 
@@ -225,19 +225,31 @@ As we can see, while the degree to which items are correlated varies, there are 
   
     g) PC’s provide us with a low dimensional view of the self-esteem scores. Use a biplot with the first two PC's to display the data.  Give an interpretation of PC1 and PC2 from the plot. (try `ggbiplot` if you could, much prettier!)
 
-```{r, fig.width=6, fig.height=3}
+a) I've displayed the PC loadings below. PCs are indeed unit vectors that are orthogonal to each other. This is necessarily the case. 
+```{r}
 # first, for convenience, create a new table including only the items of interest
 esteem_87_measure <- esteem_data_adjusted[, 37:46]
-
 # now, we apply PCA without scaling 
 esteem_87_pca <- prcomp(esteem_87_measure, scale. = FALSE)
-
 # display the loadings
 esteem_87_pca$rotation
+```
 
+b) It seems PC1 can be interpreted as overall self-esteem, and serves as a weighted sum of all the items. PC2 is interesting, separating the last 3 items in the questionnaire from the rest. Based on the content of those three last questions, it can be intuited that PC2 is identifying two distinct domains of self-esteem, self-regard vs personal utility. Here, higher scores on PC2 would indicate a higher sense of personal utility.  
+
+c) The formula, given the loadings, would be as such: 
+$$
+Score = 0.235 \times Esteem87_1 + 0.244 \times Esteem87_2 + 0.279 \times Esteem87_3 + 0.261 \times Esteem87_4 + 0.312 \times Esteem87_5 + 0.313 \times Esteem87_6 + 0.299 \times Esteem87_7 + 0.393 \times Esteem87_8 + 0.398 \times Esteem87_9 + 0.376 \times Esteem87_10
+$$
+
+d) While necessarily PCs are uncorrelated, I've gone ahead and generated a correlation matrix below to demonstrate. 
+```{r}
 # assess correlation between PC1 and PC2 scores
 cor(esteem_87_pca$x[,c(1,2)])
+```
 
+e) As we can see below, the proportion of overall variance explained by PC1 is about 46%, and as expected each subsequent PC explains less of the overall variance. 
+```{r, fig.width=6, fig.height=3}
 # for convenience, extract the PVE and CPVE
 esteem_PVE <- data.frame(summary(esteem_87_pca)$importance[2, ])
 esteem_CPVE <- data.frame(summary(esteem_87_pca)$importance[3, ])
@@ -249,7 +261,10 @@ ggplot(data=esteem_PVE, aes(x = factor(1:dim(esteem_PVE)[1]), y = esteem_PVE[,1]
   ylab("Proportion of Variance Explained") +
   ggtitle("PVE Scree Plot") +
   scale_x_discrete(breaks = seq(1,10,by=1))
-  
+```
+
+f) As we can see in the plot below, the first two princial components combined explain roughly 60% of the variance. 
+```{r, fig.width=6, fig.height=3}
 # get a cumulative PVE plot for our principal components
 ggplot(data=esteem_CPVE, aes(x = factor(1:dim(esteem_CPVE)[1]), y = esteem_CPVE[,1])) + 
   geom_bar(stat="identity", fill = 'steelblue1', alpha = 0.8) +
@@ -257,11 +272,14 @@ ggplot(data=esteem_CPVE, aes(x = factor(1:dim(esteem_CPVE)[1]), y = esteem_CPVE[
   ylab("Cummulative Proportion of Variance Explained") +
   ggtitle("Cummulative PVE Plot") +
   scale_x_discrete(breaks = seq(1,10,by=1))
+```
 
+g) The biplot below shows two divergent "streams", corresponding to variance along PC2. This is consistent with our earlier interpretation of PC2 as picking out two separate domains of self-esteem (with Items 8-10 inclusive being indicative of a putative "personal utility" domain). 
+```{r, fig.width=6, fig.height=3}
 # create a biplot for our first two PCs - here I use the AMR package function ggplot_pca()
 ggplot_pca(x=esteem_87_pca, arrows_textsize = 3, arrows_colour = "red4", points_size = 1) + xlab("PC1") + ylab("PC2") + ggtitle("Biplot of first two Principal Components")
-
 ```
+
 
 5. Apply k-means to cluster subjects on the original esteem scores
 
@@ -271,17 +289,22 @@ ggplot_pca(x=esteem_87_pca, arrows_textsize = 3, arrows_colour = "red4", points_
     
     c) Can you visualize the clusters with somewhat clear boundaries? You may try different pairs of variables and different PC pairs of the esteem scores.
 
+a) based on the Total Within Sum of Square plot below, I have decided to use 3 clusters, as this seems to correspond with a reasonable "elbow". 
 ```{r, fig.width=6, fig.height=3}
 # determine optimal number of clusters
 fviz_nbclust(esteem_87_measure, kmeans, method = "wss")
 num_clusters = 3 # based on elbow method 
-
 esteem_87_clust <- kmeans(esteem_87_measure, centers = num_clusters) # cluster into 3 groups
+```
 
+b) To get a quick visual sense of some cluster characteristics, I've calculated the mean score along each item for each cluster, and plotted them. As we can see in the blow below some cluster chatacretistics are as follows:
+- Cluster 1: This cluster seems to have overall lower scores on self-esteem items. 
+- Cluster 2: This cluster seems to have overall higher scores on self-esteem items.
+- Cluster 3: This cluster seems to have higher scores on earlier items, and lower scores on later items. If we combine this with our interpretation of PC2 earlier, we can surmise that this cluster seems to have higher self-regard, but lower perceived personal utility. 
+```{r, fig.width=6, fig.height=3}
 # to evaluate, let's add cluster as a variable
 esteem_raw_clust <- esteem_87_measure
 esteem_raw_clust$cluster <- factor(esteem_87_clust$cluster)
-
 # get at some cluster differences
 cluster_avg_scores <- esteem_raw_clust %>%
   group_by(cluster) %>%
@@ -293,7 +316,10 @@ ggplot(data = melt(cluster_avg_scores), aes(x = variable, y = value, group = clu
   ggtitle("Common Cluster Features") +
   ylab("Cluster Avg. Score") +
   xlab("Item")
+```
 
+c) After a trying different combinations, I felt that plotting the clusters against their PCs gave the clearest grouping, visualized below. 
+```{r, fig.width=6, fig.height=3}
 # Visualize clusters
 # Plotting by the first two PCs
 ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw_clust$cluster)) + 
@@ -317,65 +343,92 @@ ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw
         
       - Write a summary of your findings. In particular, explain what and how the variables in the model affect one's self-esteem. 
         
-prepare the model
+a) Here I will generate a new data.frame that contains my variables of interest. I am excluding measures collected in 2005, as this well after when the outcome variable we're intereted in was measured. I am taking the log of income for both personal income and family income, as this better gets at relative differences in both, and it is well established in psychology literature that in terms of affecting behavior and cognition, it is not absolute, but relative, differences in wealth that underlie effects (https://journals.sagepub.com/doi/abs/10.1177/0956797610362671). 
 ```{r}
 # ok, we'll be building a data.frame that contains potential explanatory factors. initialize from our response variable
 selfEsteem_model <- data.frame(esteem_87_pca$x[,1])
 names(selfEsteem_model) <- "self_esteem"
 # add personal information factors
-selfEsteem_model$gender <- factor(esteem_data$Gender) # gender as factor
-selfEsteem_model$eventual_education <- esteem_data$Education05 
-selfEsteem_model$log_income <- log(esteem_data$Income87 + (abs(min(esteem_data$Income87)) + 0.1)) # log of income, adding a small amount to mitigate NaNs
-selfEsteem_model$job <- factor(esteem_data$Job05)
+selfEsteem_model$gender <- esteem_data$Gender 
+selfEsteem_model$log_income <- log(esteem_data$Income87 + (abs(min(esteem_data$Income87)) + 0.0001)) # log of income, adding a small amount to mitigate NaNs
 # add household environment factors
 selfEsteem_model$magazine <- factor(esteem_data$Imagazine)
 selfEsteem_model$newspaper <- factor(esteem_data$Inewspaper)
 selfEsteem_model$library <- factor(esteem_data$Ilibrary)
 selfEsteem_model$motherEd <- esteem_data$MotherEd
 selfEsteem_model$fatherEd <- esteem_data$FatherEd
-selfEsteem_model$famIncome <- log(esteem_data$FamilyIncome78 + (abs(min(esteem_data$FamilyIncome78)) + 0.1))
+selfEsteem_model$famIncome <- log(esteem_data$FamilyIncome78 + (abs(min(esteem_data$FamilyIncome78)) + 0.0001))  # log of family income, adding a small amount to mitigate NaNs
 # intelligence proxy (PC1 of SVAB)
 svab_pca <- prcomp(esteem_data[,16:25], scale. = TRUE) # apply PCA to SVAB
 selfEsteem_model$intelligence <- svab_pca$x[,1]
 ```
 
-run different regression models
+b) Here I will run several regression models to try to predict self esteem. I will generate and compare 3 models:
+
+- A family Socio-Economic-Status model that uses maternal and paternal education, along with family income, as predictors. 
+- A household media consumption model that uses consumption of magazines, newspapers, and library attendance as predictors. 
+- A model based on income and SVAB-measured "intelligence" as predictors. 
+
+I have chosen these because SES during development, media consumption habits, and income & intelligence have all been linked to self-esteem in prior literature. I have first evaluated if there are gender differences in self-esteem overall via an Analysis of Variance, and found that this was indeed the case, with males having overall higher levels of self-esteem. Because of this, I chose ot include gender as a variable in my linear models, at least initially. I have also chosen to apply B&H False-Discovery-Rate correction to my analyses, since we are starting to make more comparisons here. 
+
+My first step was to check for gender differences. We can see there are indeed gender differences, so I will include it as a variable in my models. 
 ```{r}
 # are there gender differences in self esteem as measured by the questionnaire?
 gender_diff <- aov(self_esteem ~ gender, data=selfEsteem_model)
 summary(gender_diff)
+```
 
+Next, I will run the family SES model. 
+```{r}
 # this model will test the hypothesis that family SES during development mediates eventual self-esteem
 family_SES_model <- lm(self_esteem ~ motherEd + fatherEd + famIncome + gender, data = selfEsteem_model)
 summary(family_SES_model)
 FamSES_fdr_p <- p.adjust(p = summary(family_SES_model)$coefficients[,4], method = "BH", n = length(summary(family_SES_model)$coefficients[,4]))
 FamSES_fdr_p
+```
 
+Now, the Household Media Consumption model.
+```{r}
 # this model will test the hypothesis that household media habits mediate self esteem
 household_media_model <- lm(self_esteem ~ magazine + newspaper + library + gender, data = selfEsteem_model)
 summary(household_media_model)
 HouseMEdia_fdr_p <- p.adjust(p = summary(household_media_model)$coefficients[,4], method = "BH", n = length(summary(household_media_model)$coefficients[,4]))
 HouseMEdia_fdr_p
+```
 
+Finally, I will run the Intelligence and Income model. 
+```{r} 
 # this model will test the hypothesis that intelligence and income (two highly related variables in the literature) mediate self-esteem
 intelligence_income_gender_model <- lm(self_esteem ~ intelligence + log_income + gender, data = selfEsteem_model)
 summary(intelligence_income_gender_model)
+IntelIncomeGender_fdr_p <- p.adjust(p = summary(intelligence_income_gender_model)$coefficients[,4], method = "BH", n = length(summary(intelligence_income_gender_model)$coefficients[,4]))
+IntelIncomeGender_fdr_p
+```
+
+Comparing all 3 models, I have chosen the intelligence + income model based on having the highest R^2, and lowest residual standard error. However, we can see that gender is not very predictive in this model, so let's do an F-Test to see if we can remove it. 
+```{r}
 # let's see if we can reasonably remove the gender variable by conducting an F test
 intelligence_income_model <- lm(self_esteem ~ intelligence + log_income, data = selfEsteem_model) # reduced model
 anova(intelligence_income_model, intelligence_income_gender_model) # run test 
+```
+
+As we can see, we cannot reject the null, so we can reasonably remove gender as a variable. This is likely due to most of the gender information being captured by the exaggerated income gender disparity at the time of data acquisition. Now, let's display the new (reduced) model, and FDR-corrected p-values. 
+```{r}
 # since we cannot reject the null, we will stick with the model that doesn't include gender
 summary(intelligence_income_model)
 IntelIncome_fdr_p <- p.adjust(p = summary(intelligence_income_model)$coefficients[,4], method = "BH", n = length(summary(intelligence_income_model)$coefficients[,4]))
 IntelIncome_fdr_p
+```
 
-stargazer(family_SES_model, intelligence_income_model, household_media_model, type = 'latex', 
+Just for ease of comparison, I've laid out the three models here:
+```{r results='asis'}
+stargazer(family_SES_model, household_media_model, intelligence_income_model,  type = 'latex', 
                      keep.stat = c("n", "rsq", "sigma2", "ser"))
 ```
 
-model diagnostics
+Now I will run some diagnostics on my income + intelligence model. We can be seen in the plots below, the asusmptions of linearity, , normality, and homoscedasticity are reasonably (albeit not perfectly) met. 
 ```{r}
-plot(intelligence_income_model, 1, pch=16) # residual, check linearity
-abline(h=0, col="blue", lwd=2)
+plot(intelligence_income_model, 1) # residual, check linearity
 plot(intelligence_income_model, 2) # qq, check normality
 plot(intelligence_income_model, 3) # scale-location, check homoscedasticity
 ```
