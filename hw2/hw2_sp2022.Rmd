@@ -1,15 +1,11 @@
 ---
-title: "Modern Data Mining, HW 2"
+title: "Modern Data Mining, HW 2 GROUP 18"
 author:
 - Diego G. Davila
 - Margaret Gardner
 - Joelle Bagautdinova
 date: 'Due: 11:59 PM,  Sunday, 02/13'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: show
     highlight: haddock
@@ -18,6 +14,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -26,11 +26,14 @@ urlcolor: blue
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, fig.width=8, fig.height=4)
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
-# check if you have ISLR package, if not, install it
-if(!require('pacman', 'factoextra', 'AMR', 'stargazer')) {install.packages('pacman', 'factoextra', 'AMR', 'stargazer')}
-#if(!require('reshape2')) {install.packages('reshape2')} # this will be useful later for plotting
+# check if you have packages, if not, install it
+if(!require('pacman')){install.packages('pacman')}
+if(!require('factoextra')){install.packages('factoextra')}
+if(!require('AMR')){install.packages('AMR')}
+if(!require('stargazer')){install.packages('stargazer')}
+if(!require('reshape2')){install.packages('reshape2')} # this will be useful later for plotting
 pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra, stargazer) # add the packages needed
 ```
 
@@ -135,13 +138,13 @@ The following 10 questions are answered as 1: strongly agree, 2: agree, 3: disag
 
 Load the data. Do a quick EDA to get familiar with the data set. Pay attention to the unit of each variable. Are there any missing values?
 
-Here I'll read in the data and display some rows to make sure I've got what I'm expecting
+Here I'll read in the data and display some rows to make sure I've got what I'm expecting.
 ```{r}
 esteem_data <- fread('data/NLSY79.csv') # read in the csv
 head(esteem_data, 5) # show the first 5 rows to get a sense of what we have
 ```
 
-Now, let's evaluate the structure, fields, missing values, etc. Here I'll use skimr to get a good sense as to what the data looks like, how it's distributed, and see if there are any missing values. I've also included a small line of code jsut reporting missing values (none). 
+Now, let's evaluate the structure, fields, missing values, etc. Here I'll use skimr to get a good sense as to what the data looks like, how it's distributed, and see if there are any missing values. I've also included a small line of code just reporting missing values (none). 
 ```{r}
 skimr::skim(esteem_data) # get some quick information about the data
 # although skimr will display any missing values, for convenience I'll use the statement below
@@ -177,7 +180,7 @@ sapply(x, function(x) c( "Mean"= mean(x),
 ```
 
 Now, I'll generate some histograms so we can have a visual representation of what each item looks like.
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=8}
 # Plot each item's histogram
 ggplot(gather(esteem_data_adjusted[, 37:46]), aes(value)) + 
   geom_histogram(binwidth = 1, fill = 'seagreen4', alpha = 0.8) + 
@@ -199,7 +202,7 @@ esteem_pairwise_corr # let's see the matrix
 ```
 
 Now, I'll plot a heatmap of the correlation matrix to get a quick visual sense of how correlated these items are. 
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=8, warning=FALSE, fig.keep='all'}
 ggplot(data = melt(esteem_pairwise_corr), aes(x=Var1, y=Var2, fill=value)) + 
   geom_tile() +
   ggtitle('Self-Esteem_87 Items Correlation Matrix') + 
@@ -239,7 +242,7 @@ b) It seems PC1 can be interpreted as overall self-esteem, and serves as a weigh
 
 c) The formula, given the loadings, would be as such: 
 $$
-Score = 0.235 \times Esteem87_1 + 0.244 \times Esteem87_2 + 0.279 \times Esteem87_3 + 0.261 \times Esteem87_4 + 0.312 \times Esteem87_5 + 0.313 \times Esteem87_6 + 0.299 \times Esteem87_7 + 0.393 \times Esteem87_8 + 0.398 \times Esteem87_9 + 0.376 \times Esteem87_10
+Score = 0.235 \times Esteem87_1 + 0.244 \times Esteem87_2 + 0.279 \times Esteem87_3 + 0.261 \times Esteem87_4 + \\ 0.312 \times Esteem87_5 + 0.313 \times Esteem87_6 + 0.299 \times Esteem87_7 + 0.393 \times Esteem87_8 + \\ 0.398 \times Esteem87_9 + 0.376 \times Esteem87_10
 $$
 
 d) While necessarily PCs are uncorrelated, I've gone ahead and generated a correlation matrix below to demonstrate. 
@@ -248,8 +251,8 @@ d) While necessarily PCs are uncorrelated, I've gone ahead and generated a corre
 cor(esteem_87_pca$x[,c(1,2)])
 ```
 
-e) As we can see below, the proportion of overall variance explained by PC1 is about 46%, and as expected each subsequent PC explains less of the overall variance. 
-```{r, fig.width=6, fig.height=3}
+e) As we can see below, the proportion of overall variance explained by PC1 is about 46%, and as expected each subsequent PC explains less of the overall variance than the previous. 
+```{r, fig.width=10, fig.height=8}
 # for convenience, extract the PVE and CPVE
 esteem_PVE <- data.frame(summary(esteem_87_pca)$importance[2, ])
 esteem_CPVE <- data.frame(summary(esteem_87_pca)$importance[3, ])
@@ -264,7 +267,7 @@ ggplot(data=esteem_PVE, aes(x = factor(1:dim(esteem_PVE)[1]), y = esteem_PVE[,1]
 ```
 
 f) As we can see in the plot below, the first two princial components combined explain roughly 60% of the variance. 
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=8}
 # get a cumulative PVE plot for our principal components
 ggplot(data=esteem_CPVE, aes(x = factor(1:dim(esteem_CPVE)[1]), y = esteem_CPVE[,1])) + 
   geom_bar(stat="identity", fill = 'steelblue1', alpha = 0.8) +
@@ -275,7 +278,7 @@ ggplot(data=esteem_CPVE, aes(x = factor(1:dim(esteem_CPVE)[1]), y = esteem_CPVE[
 ```
 
 g) The biplot below shows two divergent "streams", corresponding to variance along PC2. This is consistent with our earlier interpretation of PC2 as picking out two separate domains of self-esteem (with Items 8-10 inclusive being indicative of a putative "personal utility" domain). 
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=8}
 # create a biplot for our first two PCs - here I use the AMR package function ggplot_pca()
 ggplot_pca(x=esteem_87_pca, arrows_textsize = 3, arrows_colour = "red4", points_size = 1) + xlab("PC1") + ylab("PC2") + ggtitle("Biplot of first two Principal Components")
 ```
@@ -289,19 +292,19 @@ ggplot_pca(x=esteem_87_pca, arrows_textsize = 3, arrows_colour = "red4", points_
     
     c) Can you visualize the clusters with somewhat clear boundaries? You may try different pairs of variables and different PC pairs of the esteem scores.
 
-a) based on the Total Within Sum of Square plot below, I have decided to use 3 clusters, as this seems to correspond with a reasonable "elbow". 
-```{r, fig.width=6, fig.height=3}
+a) Based on the Within Sum of Squares plot below, I have decided to use 3 clusters, as this seems to correspond with a reasonable "elbow". 
+```{r, fig.width=10, fig.height=4}
 # determine optimal number of clusters
 fviz_nbclust(esteem_87_measure, kmeans, method = "wss")
 num_clusters = 3 # based on elbow method 
 esteem_87_clust <- kmeans(esteem_87_measure, centers = num_clusters) # cluster into 3 groups
 ```
 
-b) To get a quick visual sense of some cluster characteristics, I've calculated the mean score along each item for each cluster, and plotted them. As we can see in the blow below some cluster chatacretistics are as follows:
+b) To get a quick visual sense of some cluster characteristics, I've calculated the mean score along each item for each cluster, and plotted them. As we can see in the blow below some cluster characteristics are as follows:
 - Cluster 1: This cluster seems to have overall lower scores on self-esteem items. 
 - Cluster 2: This cluster seems to have overall higher scores on self-esteem items.
 - Cluster 3: This cluster seems to have higher scores on earlier items, and lower scores on later items. If we combine this with our interpretation of PC2 earlier, we can surmise that this cluster seems to have higher self-regard, but lower perceived personal utility. 
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=5, warning=FALSE}
 # to evaluate, let's add cluster as a variable
 esteem_raw_clust <- esteem_87_measure
 esteem_raw_clust$cluster <- factor(esteem_87_clust$cluster)
@@ -319,7 +322,7 @@ ggplot(data = melt(cluster_avg_scores), aes(x = variable, y = value, group = clu
 ```
 
 c) After a trying different combinations, I felt that plotting the clusters against their PCs gave the clearest grouping, visualized below. 
-```{r, fig.width=6, fig.height=3}
+```{r, fig.width=10, fig.height=5}
 # Visualize clusters
 # Plotting by the first two PCs
 ggplot(data = data.frame(esteem_87_pca$x), aes(x=PC1, y=PC2, colour = esteem_raw_clust$cluster)) + 
@@ -369,7 +372,7 @@ b) Here I will run several regression models to try to predict self esteem. I wi
 - A household media consumption model that uses consumption of magazines, newspapers, and library attendance as predictors. 
 - A model based on income and SVAB-measured "intelligence" as predictors. 
 
-I have chosen these because SES during development, media consumption habits, and income & intelligence have all been linked to self-esteem in prior literature. I have first evaluated if there are gender differences in self-esteem overall via an Analysis of Variance, and found that this was indeed the case, with males having overall higher levels of self-esteem. Because of this, I chose ot include gender as a variable in my linear models, at least initially. I have also chosen to apply B&H False-Discovery-Rate correction to my analyses, since we are starting to make more comparisons here. 
+I have chosen these because SES during development, media consumption habits, and income & intelligence have all been linked to self-esteem in prior literature. I have first evaluated if there are gender differences in self-esteem overall via an Analysis of Variance, and found that this was indeed the case, with males having overall higher levels of self-esteem. Because of this, I chose to include gender as a variable in my linear models, at least initially. I have also chosen to apply B&H False-Discovery-Rate correction to my analyses, since we are starting to make more comparisons here. 
 
 My first step was to check for gender differences. We can see there are indeed gender differences, so I will include it as a variable in my models. 
 ```{r}
@@ -412,7 +415,7 @@ intelligence_income_model <- lm(self_esteem ~ intelligence + log_income, data = 
 anova(intelligence_income_model, intelligence_income_gender_model) # run test 
 ```
 
-As we can see, we cannot reject the null, so we can reasonably remove gender as a variable. This is likely due to most of the gender information being captured by the exaggerated income gender disparity at the time of data acquisition. Now, let's display the new (reduced) model, and FDR-corrected p-values. 
+As we can see, p = 0.74. We cannot reject the null, so we can reasonably remove gender as a variable. This is likely due to most of the gender information being captured by the large income gender disparity at the time of data acquisition. Now, let's display the new (reduced) model, and FDR-corrected p-values. 
 ```{r}
 # since we cannot reject the null, we will stick with the model that doesn't include gender
 summary(intelligence_income_model)
@@ -422,16 +425,19 @@ IntelIncome_fdr_p
 
 Just for ease of comparison, I've laid out the three models here:
 ```{r results='asis'}
-stargazer(family_SES_model, household_media_model, intelligence_income_model,  type = 'latex', 
+stargazer(family_SES_model, household_media_model, intelligence_income_model,  type = 'html', 
                      keep.stat = c("n", "rsq", "sigma2", "ser"))
 ```
 
-Now I will run some diagnostics on my income + intelligence model. We can be seen in the plots below, the asusmptions of linearity, , normality, and homoscedasticity are reasonably (albeit not perfectly) met. 
-```{r}
+
+
+Now I will run some diagnostics on my income + intelligence model. We can see in the plots below that the asusmptions of linearity, normality, and homoscedasticity are reasonably (albeit not perfectly) met. 
+```{r, fig.width=10, fig.height=6}
 plot(intelligence_income_model, 1) # residual, check linearity
 plot(intelligence_income_model, 2) # qq, check normality
 plot(intelligence_income_model, 3) # scale-location, check homoscedasticity
 ```
+
 
 
 # Case study 2: Breast cancer sub-type
