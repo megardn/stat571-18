@@ -6,10 +6,6 @@ author:
 - Margaret Gardner
 date: 'Due: 11:59 PM,  Sunday, 02/13'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: show
     highlight: haddock
@@ -18,6 +14,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -266,12 +266,13 @@ brca_log <- log2(as.matrix(brca_sub+1e-10))
 
 2. Apply kmeans on the transformed dataset with 4 centers and output the discrepancy table between the real sub-type `brca_subtype` and the cluster labels.
 
-``` {r case2 kmeans}
+``` {r case2 kmeans, eval=F}
+set.seed(0)
 #running kmeans with 4 centers, 10 starts
 brca_sub_kmeans <- kmeans(x = brca_log, centers=4, nstart = 10)
 
 #saving output because it seems like a good idea
-saveRDS(brca_sub_kmeans, "output/brca_kmeans.RDS") #not pushed to git
+saveRDS(brca_sub_kmeans, "output/brca_kmeans.RDS") #note - csv not pushed to git due to size
 ```
 
 ``` {r case2 kmeans2}
@@ -288,12 +289,19 @@ Clustering based on log-transformed values doesn't seem to do a great job reveal
 
     a) Apply PCA on the centered and scaled dataset. How many PCs should we use and why? You are encouraged to use `irlba::irlba()`.
 
-``` {r case2 3.a}
+``` {r case2 3.a, eval=F}
 #running PCA with 3 methods to test - using log-transformed data due to right skew
 
 ## method 1: prcomp()
-pca_brca_test <- prcomp(brca_log, n=20, center= TRUE, scale=TRUE)
-saveRDS(pca_brca_test, "output/brca_pca_full.RDS") #not pushed to git
+pca_brca_test <- prcomp(brca_log, center= TRUE, scale=TRUE) 
+## save first 20
+pca_brca_test$rotation <- pca_brca_test$rotation[, 1:20]   
+pca_brca_test$x <- pca_brca_test$x[, 1:20]
+saveRDS(pca_brca_test, "output/brca_pca_full.RDS")
+```
+```{r}
+## read in kmeans so we don't have to keep rerunning
+pca_brca_test <- readRDS("output/brca_pca_full.RDS") 
 
 ## method 2: prcomp_irlba()
 pca_brca <- prcomp_irlba(brca_log, n=20, center = T, scale. = T)
@@ -397,11 +405,13 @@ Given that the PCs calculated from scaled data capture more variance (i.e. PVE o
 set.seed(0)
 fviz_nbclust(pca_brca_unscale$x[, 1:4], kmeans, k.max = 15, method = "wss") 
 ```
-We should use 4 clusters because the 4th is where the total WSS drops.
+
+We should use 4 clusters because the 4th is where the total WSS drops, making it the most efficient cutoff point.
 
     b) Choose an optimal cluster number and apply kmeans. Compare the real sub-type and the clustering label as follows: Plot scatter plot of PC1 vs PC2. Use point color to indicate the true cancer type and point shape to indicate the clustering label. Plot the kmeans centroids with black dots. Summarize how good is clustering results compared to the real sub-type.
     
 ```{r}
+set.seed(0)
 #cluster using 4 leading PCs and k=4
 brca_spec <- kmeans(pca_brca_unscale$x[, 1:4], centers = 4, nstart=10)
 
@@ -412,7 +422,7 @@ spec_table <- data.table(PC1 = pca_brca_unscale$x[,1], #PC1
                 cl = as.factor(brca_spec$cluster))  #cluster
 
 #save centroids in PC1 vs PC2 space
-cent <- as.data.frame(brca_spec$centers) %>% select(1:2) %>% mutate(cl = as.factor(c(1:4)))
+cent <- as.data.frame(brca_spec$centers) %>% select(1:4) %>% mutate(cl = as.factor(c(1:4)))
 
 #plot
 plot_spec <- spec_table %>%   ggplot() + 
@@ -424,10 +434,9 @@ plot_spec <- spec_table %>%   ggplot() +
   geom_point(data = cent, aes(x=PC1, y=PC2, shape=cl), size = 2, fill = "black")
 
 plot_spec
-
 ```
     
-Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 1 consistently, but overall the clusters do not reflect cancer sub-types well. 
+Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 4 consistently, but overall the clusters do not reflect cancer sub-types well. 
     
     c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
 
@@ -441,7 +450,7 @@ table(brca_spec$cluster, brca_sub_kmeans$cluster)
 #to plot, make a table that has the clusters & cancer subtypes
 kmeans_table <- data.table(clust = brca_sub_kmeans$cluster, #cluster
                 specclust = brca_spec$cluster, #spectrum cluster
-                type = brca_subtype) #subtype
+                type = as.factor(brca_subtype)) #subtype
 
 #plot
 clust_bar <- kmeans_table %>% ggplot(aes(x=clust)) + 
@@ -454,22 +463,11 @@ spec_bar <- kmeans_table %>% ggplot(aes(x=specclust)) +
 
 # put the plots together
 comp3 <- ggpubr::ggarrange(clust_bar, spec_bar, ncol = 2, common.legend = T, legend = "bottom")
-annotate_figure(p=comp3, top = text_grob("Clusters Assigned by Spectrum and Direct PCA", 
+annotate_figure(p=comp3, top = text_grob("Clusters Assigned by Spectrum and Direct kmeans", 
                                color = "black", face = "bold", size = 20))
 
-## don't like these as much ##
-
-#yet another plot
-kmeans_table %>%   ggplot() + 
-  geom_bar(aes(x = clust, fill = type)) +
-  labs(color = "Cancer type") +
-  ggtitle("Frequency of Spectrum Cluster per Direct kmeans Cluster") +
-  facet_wrap(~specclust, scales = "free") +
-  xlab("Cluster Assigned by Spectrum Analysis")
-
 #other plot
-heatmap(t(data.matrix(kmeans_table)), cluster_rows=F, cluster_cols=F)
-
+heatmap(t(data.matrix(kmeans_table)))
 ```
 
 There seems to be strong agreement between the clusters assigned by direct clustering and spectrum analysis, though neither clustering method seemed to distinguish cancer subtypes. It does not appear that PCA "helped" kmeans clustering of this dataset, assuming our goal was to recapitulate cancer subtypes. However, spectrum analyses can generally be helpful in terms of reducing the computational power necessary to conduct kmeans clustering. Furthermore by clustering on the first few PCs only, you are by definition emphasizing dimensions of the data that show the greatest variance and therefore will be most useful in distinguishing between clusters while ignoring low-variance components that may create ambiguity as to which cluster an observation belongs in. 
@@ -489,13 +487,15 @@ pt_log <- log2(as.matrix(x_patient+1e-10))
 # center the data on means of brca_log
 pt_log_cent <- t(t(pt_log)/colMeans(brca_log))
 
-pca_brca_unscale$rotation
-
 #apply PC loadings for pt x
-pc1 <- sum(t(pt_log)*pca_brca_unscale$rotation[,1])
-pc2 <- sum(t(pt_log)*pca_brca_unscale$rotation[,2])
-pt_x_table <- data.table(PC1 = pc1,
-                PC2 = pc2)
+xpc1 <- sum(t(pt_log)*pca_brca_unscale$rotation[,1])
+xpc2 <- sum(t(pt_log)*pca_brca_unscale$rotation[,2])
+xpc3 <- sum(t(pt_log)*pca_brca_unscale$rotation[,3])
+xpc4 <- sum(t(pt_log)*pca_brca_unscale$rotation[,4])
+pt_x_table <- data.table(PC1 = xpc1,
+                PC2 = xpc2,
+                PC3 = xpc3,
+                PC4 = xpc4)
 
 #plot
 x_plot <- plot_spec + 
@@ -503,8 +503,22 @@ x_plot <- plot_spec +
   ggtitle("Leading Unscaled PCs of Genetic Data with Supplementary Patient X")
 
 x_plot
+
+#calculate euclidean distance
+euclidean <- function(a, b) {sqrt(sum((a - b)^2))} #define func to calculate distance
+x_vec <- c(xpc1, xpc2, xpc3, xpc4)
+x_dist_table <- data.table(dist1 = euclidean(x_vec, cent[,1]),
+                           dist2 = euclidean(x_vec, cent[,2]),
+                           dist3 = euclidean(x_vec, cent[,3]),
+                           dist4 = euclidean(x_vec, cent[,4]))
+#find closest center
+colnames(x_dist_table)[max.col(-x_dist_table)]
+
+#look at distribution of subtypes in that cluster
+kmeans_table %>% subset(specclust==4, select=type) %>% summary()
 ```
 
+Based on the distance from centers, Patient X would be assigned to cluster 4 in our analyses, indicating that they are most likely to have the Basal cancer subtype.
 
 # Case study 3: Auto data set
 
@@ -625,7 +639,4 @@ rm(se, b1, upper_ci, lower_ci, x, n_sim, b1, t_star, lse, lse_out)
 i. Summarize the LS estimates of $\boldsymbol{\beta}_1$ (stored in `results$b1`). Does the sampling distribution agree with theory? 
 
 ii.  How many of your 95% confidence intervals capture the true $\boldsymbol{\beta}_1$? Display your confidence intervals graphically. 
-
-
-
 
