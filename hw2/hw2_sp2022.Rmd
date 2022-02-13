@@ -654,7 +654,7 @@ plot(summary(pca_brca_unscale)$importance[3, ], pch=16,
      main="Scree Plot of Cumulative PVE for Unscaled Genetic Data")
 ```
 
-Given that the PCs calculated from scaled data capture more variance (i.e. PVE of PC1 in the scaled data is `r (summary(pca_brca)$importance[3])*100`% while the PVE of PC1 in the unscaled data is only `r `summary(pca_brca_unscale)$importance[3]*100`%), using the scaled PCs would more accurately represent theoriginal dataset. However, it is worth noting that there is a greater spread along the PC2 axis in the unscaled data, indicating that unscaled PC2 may have greater utility in distinguishing groups of subjects. 
+Given that the PCs calculated from scaled data capture more variance (i.e. PVE of PC1 in the scaled data is `r (summary(pca_brca)$importance[3])*100`% while the PVE of PC1 in the unscaled data is only `r summary(pca_brca_unscale)$importance[3]*100`%), using the scaled PCs would more accurately represent the original dataset. However, it is worth noting that there is a greater spread along the PC2 axis in the unscaled data, indicating that unscaled PC2 may have greater utility in distinguishing groups of subjects. 
 
 4. Spectrum clustering: center but do not scale the data
 
@@ -891,7 +891,7 @@ ggplot(auto_df, aes(x = year, y = mpg)) +
   theme_bw()
 ```
 
-Year has a significant effect on MPG (p = `r m1$coefficients[2,4]`. Specifically, increasing year by 1 unit will lead to an increase of `r m1$coefficients[2,1]` in MPG. 
+Year has a significant effect on MPG (p = `r format.pval(m1$coefficients[2,4], 3)`). Specifically, increasing year by 1 unit will lead to an increase of `r m1$coefficients[2,1]` in MPG. 
 
 b) Add `horsepower` on top of the variable `year` to your linear model. Is `year` still a significant variable at the .05 level? Give a precise interpretation of the `year`'s effect found here. 
 
@@ -902,7 +902,7 @@ m2
 
 ```
 
-Year still has a significant effect on MPG (p = `r m2$coefficients[2,4]`) when adding horsepower to the model. Specifically, in this model, increasing year by 1 unit while keeping horsepower constant will lead to an increase of `r m2$coefficients[2,1]` in MPG. On the other hand, increasing horsepower by 1 unit while keeping year constant will lead to a `r m2$coefficients[3,1]` decrease in MPG.  
+Year still has a significant effect on MPG (p = `r format.pval(m2$coefficients[2,4], 3)`) when adding horsepower to the model. Specifically, in this model, increasing year by 1 unit while keeping horsepower constant will lead to an increase of `r m2$coefficients[2,1]` in MPG. On the other hand, increasing horsepower by 1 unit while keeping year constant will lead to a `r m2$coefficients[3,1]` decrease in MPG.  
 
 
 c) The two 95% CI's for the coefficient of year differ among (i) and (ii). How would you explain the difference to a non-statistician?  
@@ -949,7 +949,7 @@ ggplot(auto_df, aes(x = horsepower, y = mpg, color = year)) +
 
 ```
 
-Yes, the interaction effect between year and horsepower is significant (p = `r m3$coefficients[4,4]`). In this model, year has both a main effect and an interaction effect:
+Yes, the interaction effect between year and horsepower is significant (p = `r format.pval(m3$coefficients[4,4], 3)`). In this model, year has both a main effect and an interaction effect:
 
 * Main effect: increasing year by 1 unit will lead to a `r m3$coefficients[2,1]` increase in MPG
 * Interaction effect: year appears to have a different effect on MPG depending on the horsepower. Based on the plot above, we can observe that cars produced in the late 70s - early 80s (lighter blue) have both higher horsepower and higher MPG, meaning that they are more powerful and efficient. On the other hand, cars from the early 70s (dark blue) have smaller horsepower and MPG, indicating that they are less powerful and less efficient. This observation makes sense, given that technological progress made over time has logically led to more powerful and more efficient cars.  
@@ -975,7 +975,7 @@ ggplot(auto_df, aes(x = cylinders, y = mpg)) +
 
 ```
 
-The number of cylinders has a significant effect on MPG (p = `r m4$coefficients[2,4]`) at the 0.01 level. Increasing the number of cylinders y 1 unit leads to a `r m4$coefficients[2,1]` decrease in MPG. 
+The number of cylinders has a significant effect on MPG (p = `r format.pval(m4$coefficients[2,4], 3)`) at the 0.01 level. Increasing the number of cylinders y 1 unit leads to a `r m4$coefficients[2,1]` decrease in MPG. 
 
 
 b) Fit a model that treats `cylinders` as a categorical/factor. Is `cylinders` significant at the .01 level? What is the effect of `cylinders` in this model? Describe the `cylinders` effect over `mpg`. 
@@ -1063,7 +1063,7 @@ pval <- anova_cyl$`Pr(>F)`[2]
 ```
 
   
-Given that p = `r pval`, we can reject the null hypothesis that `cylinders` as a continuous variable has a linear effect on MPG.    
+Given that p = `r format.pval(pval, 3)`, we can reject the null hypothesis that `cylinders` as a continuous variable has a linear effect on MPG.    
 
 
 ## Results
@@ -1086,7 +1086,7 @@ summary(m_basic)
 tmp <- summary(m_basic)
 ```
  
-Based on this initial full model, we can see that at the 0.05 significance level, all variables appear to have a significant effect on MPG the 8 cylinders level (p = `r tmp$coefficients[9,4]`). 
+Based on this initial full model, we can see that at the 0.05 significance level, all variables appear to have a significant effect on MPG the 8 cylinders level (p = `r format.pval(tmp$coefficients[9,4], 3)`). 
 
 ### Exploring interactions
 ```{r}
@@ -1168,11 +1168,11 @@ In this model, the linear terms of horsepower, weight and year are significant a
 # testing the difference between a model with only linear terms and a model with quadratic terms
 anova_quad <- anova(m_basic, m_quad)
 anova_quad
-pval <- anova_quad$`Pr(>F)`
+pval <- anova_quad$`Pr(>F)`[2]
 
 ```
 
-Given that p = `r pval`, we can reject the null hypothesis that variables *only* have a linear effect on MPG. Adding quadratic terms (model 2) leads to a significantly better fit.  
+Given that p = `r format.pval(pval, 3)`, we can reject the null hypothesis that variables *only* have a linear effect on MPG. Adding quadratic terms (model 2) leads to a significantly better fit.  
 
 
 ### Improving model parsimony
@@ -1187,11 +1187,11 @@ summary(m_quad_red)
 # testing the difference between the full quadratic model and the reduced model
 anova_quad_red <- anova(m_quad_red, m_quad)
 anova_quad_red
-pval <- anova_quad_red$`Pr(>F)`
+pval <- anova_quad_red$`Pr(>F)`[2]
 
 ```
 
-Given that p = `r pval`, we cannot reject the null hypothesis that the reduced model is sufficient in explaining the data. In other words, the full model including all quadratic terms does not significantly improve the fit. We will thus stick to this reduced model.    
+Given that p = `r format.pval(pval, 3)`, we cannot reject the null hypothesis that the reduced model is sufficient in explaining the data. In other words, the full model including all quadratic terms does not significantly improve the fit. We will thus stick to this reduced model.    
 
 
 
