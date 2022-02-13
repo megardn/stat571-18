@@ -34,7 +34,7 @@ if(!require('factoextra')){install.packages('factoextra')}
 if(!require('AMR')){install.packages('AMR')}
 if(!require('stargazer')){install.packages('stargazer')}
 if(!require('reshape2')){install.packages('reshape2')} # this will be useful later for plotting
-pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra, stargazer) # add the packages needed
+pacman::p_load(ISLR, tidyverse, data.table, reshape2, AMR, factoextra, stargazer, ggpubr, irlba, factoextra, ggrepel) # add the packages needed
 ```
 
 
@@ -456,44 +456,321 @@ We will try to use mRNA expression data alone without the labels to classify 4 s
 
 We first read the data using `data.table::fread()` which is a faster way to read in big data than `read.csv()`. 
 
-```{r}
-brca <- fread("data/brca_subtype.csv")
+```{r case2 load}
+brca <- fread("data/brca_subtype.csv") #note - csv not pushed to github repo due to size
 
 # get the sub-type information
 brca_subtype <- brca$BRCA_Subtype_PAM50
-brca <- brca[,-1]
+brca_notype <- brca[,-1]
+
+#visualize dataframe
+dim(brca_notype)  #rows, columns
+names(brca_notype)[1:20]  # see a few variable names
+summary(brca_notype[, 1:3])  # only to peek the first 3 variables - lots of variability!
+sum(is.na(brca_notype))   # quick way to check missing values. use with caution - missing values may not be coded as "na"
 ```
 
 1. Summary and transformation
-
+    
     a) How many patients are there in each sub-type? 
-
+    
+``` {r case2 1.a}
+table(brca_subtype)
+```
+    There are `r table(brca_subtype)[names(table(brca_subtype)) == "Basal"]` patients with Basal-like cancer, `r table(brca_subtype)[names(table(brca_subtype)) == "Her2"]` patients with HER2-enriched cancer, `r table(brca_subtype)[names(table(brca_subtype)) == "LumA"]` patients with Luminal A cancer and `r table(brca_subtype)[names(table(brca_subtype)) == "LumB"]`patients with Luminal B cancer.
+    
     b) Randomly pick 5 genes and plot the histogram by each sub-type.
+
+``` {r case2 1.b}
+#count number of genes (each column)
+num_gene <- ncol(brca_notype)
+# set seed for reproducibility and randomly select 5 numbers
+set.seed(5)
+sample_idx <- sample(num_gene, 5) 
+
+# plot frequency of each gene
+brca %>% 
+  select(all_of(sample_idx), BRCA_Subtype_PAM50) %>%
+  pivot_longer(cols = 1:5) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(fill = name)) +
+  facet_grid(vars(BRCA_Subtype_PAM50), vars(name)) +
+  ggtitle("5 Gene Frequencies by Cancer Subtype")
+
+```
 
     c) Remove gene with zero count and no variability. Then apply logarithmic transform.
 
+```{r case2 1.c}
+# remove genes with 0 counts
+sel_cols <- which(colSums(abs(brca_notype)) != 0) #list columns that aren't entirely 0's
+brca_sub <- brca_notype[, sel_cols, with=F] #keep only those columns in new df w/o type
+dim(brca_sub) #now has ~300 fewer genes
+
+#remove genes with 0 variance
+zero_var <- names(which(apply(brca_sub, 2, var) != 0))
+brca_sub <- brca_sub[, zero_var, with=F]
+dim(brca_sub) #no genes removed
+
+# log transform, adding 0.000000001 so that you're never trying to take log(0)
+brca_log <- log2(as.matrix(brca_sub+1e-10))
+```
 
 2. Apply kmeans on the transformed dataset with 4 centers and output the discrepancy table between the real sub-type `brca_subtype` and the cluster labels.
+
+``` {r case2 kmeans, eval=F}
+set.seed(0)
+#running kmeans with 4 centers, 10 starts
+brca_sub_kmeans <- kmeans(x = brca_log, centers=4, nstart = 10)
+
+#saving output because it seems like a good idea
+saveRDS(brca_sub_kmeans, "output/brca_kmeans.RDS") #note - csv not pushed to git due to size
+```
+
+``` {r case2 kmeans2}
+# read in kmeans so we don't have to keep rerunning
+brca_sub_kmeans <- readRDS("output/brca_kmeans.RDS")
+
+# create a discrepancy table to see how our clusters line up with known subtypes
+table(brca_subtype, brca_sub_kmeans$cluster)
+```
+
+Clustering based on log-transformed values doesn't seem to do a great job revealing known subtypes.
 
 3. Spectrum clustering: to scale or not to scale?
 
     a) Apply PCA on the centered and scaled dataset. How many PCs should we use and why? You are encouraged to use `irlba::irlba()`.
+
+``` {r case2 3.a, eval=F}
+#running PCA with 3 methods to test - using log-transformed data due to right skew
+
+## method 1: prcomp()
+pca_brca_test <- prcomp(brca_log, center= TRUE, scale=TRUE) 
+## save first 20
+pca_brca_test$rotation <- pca_brca_test$rotation[, 1:20]   
+pca_brca_test$x <- pca_brca_test$x[, 1:20]
+saveRDS(pca_brca_test, "output/brca_pca_full.RDS")
+```
+```{r}
+## read in kmeans so we don't have to keep rerunning
+pca_brca_test <- readRDS("output/brca_pca_full.RDS") 
+
+## method 2: prcomp_irlba()
+pca_brca <- prcomp_irlba(brca_log, n=20, center = T, scale. = T)
+
+## method 3: irlba()
+### center and scale the data
+brca_sub_scaled_centered <- scale(as.matrix(brca_log), center = T, scale = T)
+### calculate 20 leading components using SVD
+svd_ret <- irlba::irlba(brca_sub_scaled_centered, nv = 20)
+### Approximate the PVE
+svd_var <- svd_ret$d^2/(nrow(brca_sub_scaled_centered)-1)
+pve_apx <- svd_var/num_gene
+### get pc score
+pc_score <- brca_sub_scaled_centered %*% svd_ret$v[, 1:3]
+
+#table to see differences in PVE of PCs calculated with different methods
+pve_table <- data.table(pr.comp = summary(pca_brca)$importance[2, ],
+                pr.comp_irlba = summary(pca_brca_test)$importance[2,1:20],
+                irlba = pve_apx) %>%
+              as.data.frame()
+pve_df <- data.frame(t(pve_table[1:3]))
+names(pve_df) <- gsub("X", "PC", names(pve_df))
+print(pve_df)
+
+#plot PVEs to see how many PCs we should use
+knitr::kable(summary(pca_brca)$importance)
+plot(pca_brca)
+summary(pca_brca)
+
+#scree plot
+plot(summary(pca_brca)$importance[2, ],
+     ylab="PVE",
+     xlab="Number of PC's",
+     pch = 16, 
+     main="Scree Plot of PVE for Scaled & Centered Data using SVD")
+```
+
+We should use 4 PCs because the 4th is where the variability explained drops, but not much variance is explained overall (as seen in the scree plot below).
+
+```{r}
+#scree plot of cumulative variance
+plot(summary(pca_brca)$importance[3, ],
+     ylab="Cumulative PVE",
+     xlab="Number of PC's",
+     pch = 16, 
+     main="Scree Plot of Cumulative Variance for Scaled & Centered Data")
+```
     
-    b) Plot PC1 vs PC2 of the centered and scaled data and PC1 vs PC2 of the centered but unscaled data side by side. Should we scale or not scale for clustering propose? Why? (Hint: to put plots side by side, use `gridExtra::grid.arrange()` or `ggpubr::ggrrange()` or `egg::ggrrange()` for ggplots; use `fig.show="hold"` as chunk option for base plots)
+    b) Plot PC1 vs PC2 of the centered and scaled data and PC1 vs PC2 of the centered but unscaled data side by side. Should we scale or not scale for clustering propose? Why?
+    
+``` {r}
+#PCA on SCD with data unscaled
+pca_brca_unscale <- prcomp_irlba(brca_log, n=20, center = T, scale = F)
+
+#plot for scaled data
+plot_scale <- as.data.frame(pca_brca$x) %>% 
+  ggplot(aes(x=PC1, y=PC2)) +    # Try other PC's vs. PC1, any patterns?
+  geom_point(color='blue')+
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0)  +
+  ggtitle("Scaled") +
+  theme_bw()
+
+#plot for unscaled data
+plot_unscale <- as.data.frame(pca_brca_unscale$x) %>% 
+  ggplot(aes(x=PC1, y=PC2)) +    # Try other PC's vs. PC1, any patterns?
+  geom_point(color='green')+
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  ggtitle("Unscaled") +
+  theme_bw()
+
+# put the plots together
+comp2 <- ggpubr::ggarrange(plot_scale, plot_unscale, ncol = 2)
+annotate_figure(p=comp2, top = text_grob("PC2 vs PC1 for Scaled and Unscaled Genetic Data", 
+                               color = "black", face = "bold", size = 20))
+```
+
+```{r}
+#looking at PVE for unscaled data to see how it compares
+plot(summary(pca_brca_unscale)$importance[2, ],
+     ylab="PVE",
+     xlab="Number of PC's",
+     pch = 16, 
+     main="Scree Plot of PVE for Unscaled Data")
+
+plot(summary(pca_brca_unscale)$importance[3, ], pch=16,
+     ylab="Cumulative PVE",
+     xlab="Number of PC's",
+     main="Scree Plot of Cumulative PVE for Unscaled Genetic Data")
+```
+
+Given that the PCs calculated from scaled data capture more variance (i.e. PVE of PC1 in the scaled data is `r (summary(pca_brca)$importance[3])*100`% while the PVE of PC1 in the unscaled data is only `r `summary(pca_brca_unscale)$importance[3]*100`%), using the scaled PCs would more accurately represent theoriginal dataset. However, it is worth noting that there is a greater spread along the PC2 axis in the unscaled data, indicating that unscaled PC2 may have greater utility in distinguishing groups of subjects. 
 
 4. Spectrum clustering: center but do not scale the data
 
     a) Use the first 4 PCs of the centered and unscaled data and apply kmeans. Find a reasonable number of clusters using within sum of squared with the elbow rule.
     
+``` {r}
+#use elbow method - calculate within sum of squares for different ks (numbers of clusters) up to 15
+set.seed(0)
+fviz_nbclust(pca_brca_unscale$x[, 1:4], kmeans, k.max = 15, method = "wss") 
+```
+
+We should use 4 clusters because the 4th is where the total WSS drops, making it the most efficient cutoff point.
+
     b) Choose an optimal cluster number and apply kmeans. Compare the real sub-type and the clustering label as follows: Plot scatter plot of PC1 vs PC2. Use point color to indicate the true cancer type and point shape to indicate the clustering label. Plot the kmeans centroids with black dots. Summarize how good is clustering results compared to the real sub-type.
     
+```{r}
+set.seed(0)
+#cluster using 4 leading PCs and k=4
+brca_spec <- kmeans(pca_brca_unscale$x[, 1:4], centers = 4, nstart=10)
+
+#to plot, make a table that has the first two PCs, cancer subtype, and cluster
+spec_table <- data.table(PC1 = pca_brca_unscale$x[,1], #PC1
+                PC2 = pca_brca_unscale$x[,2], #PC2
+                col = as.factor(brca_subtype), #subtype
+                cl = as.factor(brca_spec$cluster))  #cluster
+
+#save centroids in PC1 vs PC2 space
+cent <- as.data.frame(brca_spec$centers) %>% select(1:4) %>% mutate(cl = as.factor(c(1:4)))
+
+#plot
+plot_spec <- spec_table %>%   ggplot() + 
+  geom_point(aes(x = PC1, y = PC2, col = col, shape = cl)) +
+  labs(color = "Cancer type", shape = "Cluster") +
+  xlab("PC1") +
+  ylab("PC2") +
+  ggtitle("Leading Unscaled PCs") + 
+  geom_point(data = cent, aes(x=PC1, y=PC2, shape=cl), size = 2, fill = "black")
+
+plot_spec
+```
+    
+Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 4 consistently, but overall the clusters do not reflect cancer sub-types well. 
+    
     c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
+
+```{r}
+#kmeans on original log-transformed data: brca_sub_kmeans
+#clustering on 4 unscaled PCs: brca_spec
+
+# create a discrepancy table to see how our clusters line up with each other
+table(brca_spec$cluster, brca_sub_kmeans$cluster)
+
+#to plot, make a table that has the clusters & cancer subtypes
+kmeans_table <- data.table(clust = brca_sub_kmeans$cluster, #cluster
+                specclust = brca_spec$cluster, #spectrum cluster
+                type = as.factor(brca_subtype)) #subtype
+
+#plot
+clust_bar <- kmeans_table %>% ggplot(aes(x=clust)) + 
+  geom_bar(aes(fill=type), position="stack", stat="count") +
+  xlab("Cluster")
+
+spec_bar <- kmeans_table %>% ggplot(aes(x=specclust)) + 
+  geom_bar(aes(fill=type), position="stack", stat="count") +
+  xlab("Spectrum Cluster")
+
+# put the plots together
+comp3 <- ggpubr::ggarrange(clust_bar, spec_bar, ncol = 2, common.legend = T, legend = "bottom")
+annotate_figure(p=comp3, top = text_grob("Clusters Assigned by Spectrum and Direct kmeans", 
+                               color = "black", face = "bold", size = 20))
+
+#other plot
+heatmap(t(data.matrix(kmeans_table)))
+```
+
+There seems to be strong agreement between the clusters assigned by direct clustering and spectrum analysis, though neither clustering method seemed to distinguish cancer subtypes. It does not appear that PCA "helped" kmeans clustering of this dataset, assuming our goal was to recapitulate cancer subtypes. However, spectrum analyses can generally be helpful in terms of reducing the computational power necessary to conduct kmeans clustering. Furthermore by clustering on the first few PCs only, you are by definition emphasizing dimensions of the data that show the greatest variance and therefore will be most useful in distinguishing between clusters while ignoring low-variance components that may create ambiguity as to which cluster an observation belongs in. 
     
     d) Now we have an x patient with breast cancer but with unknown sub-type. We have this patient's mRNA sequencing data. Project this x patient to the space of PC1 and PC2. (Hint: remember we remove some gene with no counts or no variablity, take log and centered) Plot this patient in the plot in iv) with a black dot. Calculate the Euclidean distance between this patient and each of centroid of the cluster. Can you tell which sub-type this patient might have? 
     
 ```{r}
 x_patient <- fread("data/brca_x_patient.csv")
+
+# remove genes with 0 counts
+x_patient <- x_patient[, sel_cols, with=F]
+#remove genes with 0 variance
+x_patient <- x_patient[, zero_var, with=F]
+# log transform, adding 0.000000001 so that you're never trying to take log(0)
+pt_log <- log2(as.matrix(x_patient+1e-10))
+
+# center the data on means of brca_log
+pt_log_cent <- t(t(pt_log)/colMeans(brca_log))
+
+#apply PC loadings for pt x
+xpc1 <- sum(t(pt_log)*pca_brca_unscale$rotation[,1])
+xpc2 <- sum(t(pt_log)*pca_brca_unscale$rotation[,2])
+xpc3 <- sum(t(pt_log)*pca_brca_unscale$rotation[,3])
+xpc4 <- sum(t(pt_log)*pca_brca_unscale$rotation[,4])
+pt_x_table <- data.table(PC1 = xpc1,
+                PC2 = xpc2,
+                PC3 = xpc3,
+                PC4 = xpc4)
+
+#plot
+x_plot <- plot_spec + 
+  geom_point(data = pt_x_table, aes(x=PC1, y=PC2), size = 5, shape = "diamond", color = "darkblue") +
+  ggtitle("Leading Unscaled PCs of Genetic Data with Supplementary Patient X")
+
+x_plot
+
+#calculate euclidean distance
+euclidean <- function(a, b) {sqrt(sum((a - b)^2))} #define func to calculate distance
+x_vec <- c(xpc1, xpc2, xpc3, xpc4)
+x_dist_table <- data.table(dist1 = euclidean(x_vec, cent[,1]),
+                           dist2 = euclidean(x_vec, cent[,2]),
+                           dist3 = euclidean(x_vec, cent[,3]),
+                           dist4 = euclidean(x_vec, cent[,4]))
+#find closest center
+colnames(x_dist_table)[max.col(-x_dist_table)]
+
+#look at distribution of subtypes in that cluster
+kmeans_table %>% subset(specclust==4, select=type) %>% summary()
 ```
+
+Based on the distance from centers, Patient X would be assigned to cluster 4 in our analyses, indicating that they are most likely to have the Basal cancer subtype.
 
 
 # Case study 3: Auto data set
