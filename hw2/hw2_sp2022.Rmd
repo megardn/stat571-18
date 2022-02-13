@@ -237,48 +237,6 @@ set.seed(5)
 sample_idx <- sample(num_gene, 5) 
 
 # plot frequency of each gene
-basal_plot <- brca %>% 
-  subset("BRCA_Subtype_PAM50" = "Basal") %>%  #select subtype
-  select(all_of(sample_idx)) %>%      # select genes by column index
-  pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value), color='black') +
-  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
-  theme(legend.position = "none") +
-  ggtitle("Basal")
-
-her_plot <- brca %>% 
-  subset("BRCA_Subtype_PAM50" = "Her2") %>%  #select subtype
-  select(all_of(sample_idx)) %>%      # select genes by column index
-  pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value)) +
-  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
-  theme(legend.position = "none") +
-  ggtitle("HER2")
-
-luma_plot <- brca %>% 
-  subset("BRCA_Subtype_PAM50" = "LumA") %>%  #select subtype
-  select(all_of(sample_idx)) %>%      # select genes by column index
-  pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value)) +
-  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
-  theme(legend.position = "none") +
-  ggtitle("Luminal A")
-
-lumb_plot <- brca %>% 
-  subset("BRCA_Subtype_PAM50" = "LumB") %>%  #select subtype
-  select(all_of(sample_idx)) %>%      # select genes by column index
-  pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value)) +
-  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
-  theme(legend.position = "none") +
-  ggtitle("Luminal B")
-
-# put all the plots together
-comp1 <- ggpubr::ggarrange(basal_plot, her_plot, luma_plot, lumb_plot, common.legend = T, legend = "bottom", ncol = 4)
-annotate_figure(p=comp1, top = text_grob("5 Gene Frequencies by Cancer Subtype", 
-                               color = "black", face = "bold", size = 20))
-
-#alternate plotting with facet_grid
 brca %>% 
   select(all_of(sample_idx), BRCA_Subtype_PAM50) %>%
   pivot_longer(cols = 1:5) %>% 
