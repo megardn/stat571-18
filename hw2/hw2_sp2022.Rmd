@@ -204,7 +204,7 @@ We will try to use mRNA expression data alone without the labels to classify 4 s
 
 We first read the data using `data.table::fread()` which is a faster way to read in big data than `read.csv()`. 
 
-```{r}
+```{r case2 load}
 brca <- fread("data/brca_subtype.csv") #note - csv not pushed to github repo due to size
 
 # get the sub-type information
@@ -241,8 +241,8 @@ basal_plot <- brca %>%
   subset("BRCA_Subtype_PAM50" = "Basal") %>%  #select subtype
   select(all_of(sample_idx)) %>%      # select genes by column index
   pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value, alpha=0.2), color='black') +
-  geom_histogram(aes(fill = name, position="identity")) +
+  ggplot(aes(x = value), color='black') +
+  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
   theme(legend.position = "none") +
   ggtitle("Basal")
 
@@ -250,8 +250,8 @@ her_plot <- brca %>%
   subset("BRCA_Subtype_PAM50" = "Her2") %>%  #select subtype
   select(all_of(sample_idx)) %>%      # select genes by column index
   pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value, alpha=0.2)) +
-  geom_histogram(aes(fill = name, position="identity")) +
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
   theme(legend.position = "none") +
   ggtitle("HER2")
 
@@ -259,8 +259,8 @@ luma_plot <- brca %>%
   subset("BRCA_Subtype_PAM50" = "LumA") %>%  #select subtype
   select(all_of(sample_idx)) %>%      # select genes by column index
   pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value, alpha=0.2)) +
-  geom_histogram(aes(fill = name, position="identity")) +
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
   theme(legend.position = "none") +
   ggtitle("Luminal A")
 
@@ -268,8 +268,8 @@ lumb_plot <- brca %>%
   subset("BRCA_Subtype_PAM50" = "LumB") %>%  #select subtype
   select(all_of(sample_idx)) %>%      # select genes by column index
   pivot_longer(cols = everything()) %>% 
-  ggplot(aes(x = value, alpha=0.2)) +
-  geom_histogram(aes(fill = name, position="identity")) +
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(fill = name, position="identity"), alpha=0.6) +
   theme(legend.position = "none") +
   ggtitle("Luminal B")
 
@@ -277,6 +277,16 @@ lumb_plot <- brca %>%
 comp1 <- ggpubr::ggarrange(basal_plot, her_plot, luma_plot, lumb_plot, common.legend = T, legend = "bottom", ncol = 4)
 annotate_figure(p=comp1, top = text_grob("5 Gene Frequencies by Cancer Subtype", 
                                color = "black", face = "bold", size = 20))
+
+#alternate plotting with facet_grid
+brca %>% 
+  select(all_of(sample_idx), BRCA_Subtype_PAM50) %>%
+  pivot_longer(cols = 1:5) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(fill = name)) +
+  facet_grid(vars(BRCA_Subtype_PAM50), vars(name)) +
+  ggtitle("5 Gene Frequencies by Cancer Subtype")
+
 ```
 
     c) Remove gene with zero count and no variability. Then apply logarithmic transform.
@@ -387,7 +397,7 @@ annotate_figure(p=comp2, top = text_grob("PC2 vs PC1 for Scaled and Unscaled Gen
                                color = "black", face = "bold", size = 20))
 ```
 
-**SCALE OR NOT???**
+**SCALE **
 
 ```{r}
 #looking at cumulative PVE for unscaled data to see how it compares
@@ -428,9 +438,37 @@ spec_table %>%   ggplot() +
   ggtitle("Leading Unscaled PCs")
 ```
     
-Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 1  consistently, but overall the clusters do not reflect cancer sub-types well. 
+Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 1 consistently, but overall the clusters do not reflect cancer sub-types well. 
     
     c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
+
+```{r}
+#kmeans on original log-transformed data: brca_sub_kmeans
+#clustering on 4 unscaled PCs: brca_spec
+
+# create a discrepancy table to see how our clusters line up with each other
+table(brca_spec$cluster, brca_sub_kmeans$cluster)
+
+#to plot, make a table that has the clusters & cancer subtypes
+kmeans_table <- data.table(clust = as.factor(brca_sub_kmeans$cluster), 
+                spec.clust = as.factor(brca_spec$cluster), #spectrum cluster
+                type = as.factor(brca_subtype)) #subtype
+
+#plot
+kmeans_table %>%   ggplot() + 
+  geom_bar(aes(x = clust, fill = type)) +
+  labs(color = "Cancer type") +
+  ggtitle("Frequency of Spectrum Cluster per Direct kmeans Cluster") +
+  facet_wrap(~spec.clust, scales = "free") +
+  xlab("Cluster Assigned by Spectrum Analysis")
+
+#other plot
+pairs(~ clust + spec.clust, data=kmeans_table, col=kmeans_table$type, size=count)
+
+#x=ppt, y=pcs, color=subtype
+```
+
+There seems to be strong agreement between the clusters assigned by direct clustering and spectrum analysis.
     
     d) Now we have an x patient with breast cancer but with unknown sub-type. We have this patient's mRNA sequencing data. Project this x patient to the space of PC1 and PC2. (Hint: remember we remove some gene with no counts or no variablity, take log and centered) Plot this patient in the plot in iv) with a black dot. Calculate the Euclidean distance between this patient and each of centroid of the cluster. Can you tell which sub-type this patient might have? 
     
