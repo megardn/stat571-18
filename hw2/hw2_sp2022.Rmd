@@ -472,14 +472,14 @@ sum(is.na(brca_notype))   # quick way to check missing values. use with caution 
 
 1. Summary and transformation
     
-    a) How many patients are there in each sub-type? 
+a) How many patients are there in each sub-type? 
     
 ``` {r case2 1.a}
 table(brca_subtype)
 ```
     There are `r table(brca_subtype)[names(table(brca_subtype)) == "Basal"]` patients with Basal-like cancer, `r table(brca_subtype)[names(table(brca_subtype)) == "Her2"]` patients with HER2-enriched cancer, `r table(brca_subtype)[names(table(brca_subtype)) == "LumA"]` patients with Luminal A cancer and `r table(brca_subtype)[names(table(brca_subtype)) == "LumB"]`patients with Luminal B cancer.
     
-    b) Randomly pick 5 genes and plot the histogram by each sub-type.
+b) Randomly pick 5 genes and plot the histogram by each sub-type.
 
 ``` {r case2 1.b}
 #count number of genes (each column)
@@ -499,7 +499,7 @@ brca %>%
 
 ```
 
-    c) Remove gene with zero count and no variability. Then apply logarithmic transform.
+c) Remove gene with zero count and no variability. Then apply logarithmic transform.
 
 ```{r case2 1.c}
 # remove genes with 0 counts
@@ -539,7 +539,7 @@ Clustering based on log-transformed values doesn't seem to do a great job reveal
 
 3. Spectrum clustering: to scale or not to scale?
 
-    a) Apply PCA on the centered and scaled dataset. How many PCs should we use and why? You are encouraged to use `irlba::irlba()`.
+a) Apply PCA on the centered and scaled dataset. How many PCs should we use and why? You are encouraged to use `irlba::irlba()`.
 
 ``` {r case2 3.a, eval=F}
 #running PCA with 3 methods to test - using log-transformed data due to right skew
@@ -602,7 +602,7 @@ plot(summary(pca_brca)$importance[3, ],
      main="Scree Plot of Cumulative Variance for Scaled & Centered Data")
 ```
     
-    b) Plot PC1 vs PC2 of the centered and scaled data and PC1 vs PC2 of the centered but unscaled data side by side. Should we scale or not scale for clustering propose? Why?
+b) Plot PC1 vs PC2 of the centered and scaled data and PC1 vs PC2 of the centered but unscaled data side by side. Should we scale or not scale for clustering propose? Why?
     
 ``` {r}
 #PCA on SCD with data unscaled
@@ -650,7 +650,7 @@ Given that the PCs calculated from scaled data capture more variance (i.e. PVE o
 
 4. Spectrum clustering: center but do not scale the data
 
-    a) Use the first 4 PCs of the centered and unscaled data and apply kmeans. Find a reasonable number of clusters using within sum of squared with the elbow rule.
+a) Use the first 4 PCs of the centered and unscaled data and apply kmeans. Find a reasonable number of clusters using within sum of squared with the elbow rule.
     
 ``` {r}
 #use elbow method - calculate within sum of squares for different ks (numbers of clusters) up to 15
@@ -660,7 +660,7 @@ fviz_nbclust(pca_brca_unscale$x[, 1:4], kmeans, k.max = 15, method = "wss")
 
 We should use 4 clusters because the 4th is where the total WSS drops, making it the most efficient cutoff point.
 
-    b) Choose an optimal cluster number and apply kmeans. Compare the real sub-type and the clustering label as follows: Plot scatter plot of PC1 vs PC2. Use point color to indicate the true cancer type and point shape to indicate the clustering label. Plot the kmeans centroids with black dots. Summarize how good is clustering results compared to the real sub-type.
+b) Choose an optimal cluster number and apply kmeans. Compare the real sub-type and the clustering label as follows: Plot scatter plot of PC1 vs PC2. Use point color to indicate the true cancer type and point shape to indicate the clustering label. Plot the kmeans centroids with black dots. Summarize how good is clustering results compared to the real sub-type.
     
 ```{r}
 set.seed(0)
@@ -690,7 +690,7 @@ plot_spec
     
 Overall, the cluster analysis did not seem to do a very good job of distinguishing cancer sub-types, as indicated above. Subjects  with Basal cancer seem to be assigned to cluster 4 consistently, but overall the clusters do not reflect cancer sub-types well. 
     
-    c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
+c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
 
 ```{r}
 #kmeans on original log-transformed data: brca_sub_kmeans
@@ -724,7 +724,7 @@ heatmap(t(data.matrix(kmeans_table)))
 
 There seems to be strong agreement between the clusters assigned by direct clustering and spectrum analysis, though neither clustering method seemed to distinguish cancer subtypes. It does not appear that PCA "helped" kmeans clustering of this dataset, assuming our goal was to recapitulate cancer subtypes. However, spectrum analyses can generally be helpful in terms of reducing the computational power necessary to conduct kmeans clustering. Furthermore by clustering on the first few PCs only, you are by definition emphasizing dimensions of the data that show the greatest variance and therefore will be most useful in distinguishing between clusters while ignoring low-variance components that may create ambiguity as to which cluster an observation belongs in. 
     
-    d) Now we have an x patient with breast cancer but with unknown sub-type. We have this patient's mRNA sequencing data. Project this x patient to the space of PC1 and PC2. (Hint: remember we remove some gene with no counts or no variablity, take log and centered) Plot this patient in the plot in iv) with a black dot. Calculate the Euclidean distance between this patient and each of centroid of the cluster. Can you tell which sub-type this patient might have? 
+d) Now we have an x patient with breast cancer but with unknown sub-type. We have this patient's mRNA sequencing data. Project this x patient to the space of PC1 and PC2. (Hint: remember we remove some gene with no counts or no variablity, take log and centered) Plot this patient in the plot in iv) with a black dot. Calculate the Euclidean distance between this patient and each of centroid of the cluster. Can you tell which sub-type this patient might have? 
     
 ```{r}
 x_patient <- fread("data/brca_x_patient.csv")
