@@ -134,12 +134,73 @@ covid_rate <- covid_rate %>%
 
 
 
-
 ## COVID case trend
 
 It is crucial to decide the right granularity for visualization and analysis. We will compare daily vs weekly total new cases by state and we will see it is hard to interpret daily report.
 
 i) Plot **new** COVID cases in NY, WA and FL by state and by day. Any irregular pattern? What is the biggest problem of using single day data? 
+
+First, we start by creating a **new_cases** variable, defined as the row-wise difference of the existing cumulative variable `cum_cases`.
+
+```{r fig.width=6}
+# create county_new_cases variable
+covid_rate <- covid_rate %>%
+  group_by(County) %>%
+  mutate(county_new_cases = cum_cases - lag(cum_cases))
+
+# the first new_cases entry for every county is an NA as there was no prior data point to compute a difference with. Thus, we replace NAs with the first reported number of cases that day. 
+covid_rate$county_new_cases <- ifelse(is.na(covid_rate$county_new_cases), covid_rate$cum_cases, covid_rate$county_new_cases)
+
+# let's see if this new variable seems right
+summary(covid_rate$county_new_cases)
+
+# some values are very negative! Let's see which: 
+covid_rate[which(covid_rate$county_new_cases < -3000), ]
+
+# it looks like the negative values happen at the first recorded date for certain counties. Not sure why?? Replacing negative value with the cumulative cases value (as this is the first day, we can take this value as is)
+covid_rate$county_new_cases <- ifelse((covid_rate$county_new_cases)<0, covid_rate$cum_cases, covid_rate$county_new_cases)
+
+summary(covid_rate$county_new_cases) # values seem reasonable now. 
+
+# this provides the number of new cases per county though, and we need to know the total sum of new daily cases per state.
+# let's have a look at a random date for a given State, let's say Florida on March 30, 2020: 
+covid_rate[covid_rate$date == "2020-03-30" & covid_rate$State == "Florida", ]
+
+# we note that there are a number of counties with NA, for instance the Holmes county. Let's close in on this county: 
+covid_rate[covid_rate$County == "Holmes" & covid_rate$State == "Florida", ]
+# as it turns out, March 30 2020 is the first day that this county started reporting cases. 
+
+# So let's create a state_new_cases variable
+covid_rate <- covid_rate %>%
+  group_by(State, date) %>%
+  mutate(state_new_cases = sum(county_new_cases, na.rm = TRUE))
+
+# let's see if this new variable seems right
+summary(covid_rate$state_new_cases) # seems reasonable, no negative values
+covid_rate %>%
+  filter(State %in% "Florida") %>%
+  group_by(date) %>%
+  summarise(
+    total_new_cases = sum(county_new_cases, na.rm = TRUE)
+  )
+
+tmp <- covid_rate[covid_rate$date == "2020-03-20" & covid_rate$State == "Florida", ]
+sum(tmp$county_new_cases)
+
+# the variable seems correct.
+
+# plot new daily covid cases in NY, WA and FL
+covid_rate %>%
+  filter(State %in% c("New York", "Washington", "Florida")) %>%
+  ggplot(aes(x = date, y = state_new_cases, color = State)) + 
+    geom_point() + 
+    facet_grid(~State) + 
+    theme_bw() +
+    ggtitle("New daily COVID cases in Florida, New York and Washington")
+
+
+```
+
 
 ii) Create **weekly new** cases per 100k `weekly_case_per100k`. Plot the spaghetti plots of `weekly_case_per100k` by state. Use `TotalPopEst2019` as population.
 
