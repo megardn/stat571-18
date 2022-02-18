@@ -140,7 +140,7 @@ It is crucial to decide the right granularity for visualization and analysis. We
 
 i) Plot **new** COVID cases in NY, WA and FL by state and by day. Any irregular pattern? What is the biggest problem of using single day data? 
 
-First, we start by creating a **new_cases** variable, defined as the row-wise difference of the existing cumulative variable `cum_cases`.
+First, we start by creating a `county_new_cases` variable, defined as the row-wise difference of the existing cumulative variable `cum_cases`. Next, we create a `state_new_cases` variable, which is the sum of all new cases per day, across all counties of a given state. 
 
 ```{r fig.width=6}
 # create county_new_cases variable
