@@ -142,36 +142,41 @@ i) Plot **new** COVID cases in NY, WA and FL by state and by day. Any irregular 
 
 First, we start by creating a `county_new_cases` variable, defined as the row-wise difference of the existing cumulative variable `cum_cases`. Next, we create a `state_new_cases` variable, which is the sum of all new cases per day, across all counties of a given state. 
 
-```{r fig.width=6}
+```{r}
+
+# some cum_cases are acutally decreasing, which is not possible for a cumulative variable. When a given cum_case value is smaller than the previous cum_case value, we replace that cum_case value by the previous value: 
+# covid_rate <- covid_rate %>%
+  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) # %>%
+  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) %>%
+  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) %>%
+  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases))
+# ended up not doing this as there are many decreasing values in a row, which means I'd have to replace by a previous value repeatedly for all those rows.
+
 # create county_new_cases variable
 covid_rate <- covid_rate %>%
   group_by(County, State) %>%
-  mutate(county_new_cases = cum_cases - lag(cum_cases))
-
-
-# the first new_cases entry for every county is an NA as there was no prior data point to compute a difference with. Thus, we replace NAs with the first reported number of cases that day. 
-covid_rate$county_new_cases <- ifelse(is.na(covid_rate$county_new_cases), covid_rate$cum_cases, covid_rate$county_new_cases)
+  mutate(county_new_cases = cum_cases - lag(cum_cases))  %>%
+  mutate(county_new_cases = ifelse(is.na(county_new_cases), cum_cases, county_new_cases)) # the first new_cases entry for every county is an NA as there was no prior data point to compute a difference with. Thus, we replace NAs with the first reported number of cases that day. 
 
 # let's see if this new variable seems right
 summary(covid_rate$county_new_cases)
 
-# some values are very negative! Let's see which: 
-covid_rate[which(covid_rate$county_new_cases < -3000), ]
+# some values are  negative! Let's see which: 
+covid_rate[which(covid_rate$county_new_cases < -1000), ]
 
+covid_rate[covid_rate$County == "Middlesex" & covid_rate$State == "Massachusetts" & (covid_rate$date == "2020-09-01" | covid_rate$date == "2020-09-02"), ]
 
-# it looks like the negative values happen at the first recorded date for certain counties. Not sure why?? Replacing negative value with the cumulative cases value (as this is the first day, we can take this value as is)
-covid_rate$county_new_cases <- ifelse((covid_rate$county_new_cases)<0, covid_rate$cum_cases, covid_rate$county_new_cases)
+# it looks like some counties have large "jumps" in their cumulative cases, for instance in MS, Middlesex county reports 27732 on 09-01, but then 25411 the next day, which leads to a difference of -2321! We suspect this is a reporting error, or a correction for a number of suspected cases which turned out not be COVID? 
 
-summary(covid_rate$county_new_cases) # values seem reasonable now. 
+# To correct for this in the county_new_cases, we replace all negative values by 0, indicating no new cases that day. 
+covid_rate$county_new_cases <- ifelse((covid_rate$county_new_cases) < 0, 
+                                      0, # if value is smaller than 0, attribute 0 to this cell
+                                      covid_rate$county_new_cases) # else, just report the current value
+
+summary(covid_rate$county_new_cases) # values seem reasonable now.
+tmp <- covid_rate[covid_rate$County == "Middlesex" & covid_rate$State == "Massachusetts", ]
 
 # this provides the number of new cases per county though, and we need to know the total sum of new daily cases per state.
-# let's have a look at a random date for a given State, let's say Florida on March 30, 2020: 
-covid_rate[covid_rate$date == "2020-03-30" & covid_rate$State == "Florida", ]
-
-# we note that there are a number of counties with NA, for instance the Holmes county. Let's close in on this county: 
-covid_rate[covid_rate$County == "Holmes" & covid_rate$State == "Florida", ]
-# as it turns out, March 30 2020 is the first day that this county started reporting cases. 
-
 # So let's create a state_new_cases variable
 covid_rate <- covid_rate %>%
   group_by(State, date) %>%
@@ -188,9 +193,10 @@ covid_rate %>%
 
 tmp <- covid_rate[covid_rate$date == "2020-03-20" & covid_rate$State == "Florida", ]
 sum(tmp$county_new_cases)
-
 # the variable seems correct.
 
+```
+```{r fig.width=6}
 # plot new daily covid cases in NY, WA and FL
 covid_rate %>%
   filter(State %in% c("New York", "Washington", "Florida")) %>%
@@ -201,10 +207,59 @@ covid_rate %>%
     ggtitle("New daily COVID cases in Florida, New York and Washington")
 
 
+# plot the cum_cases for a few counties to illustrate "breaks" in the cumulative variable (this should technically not be possible)
+PA <- covid_rate %>%
+  filter(State %in% c("Pennsylvania"),
+         County %in% c("Lancaster", "Allegheny", "Philadelphia")) %>%
+  ggplot(aes(x = date, y = cum_cases, color = County)) + 
+    geom_point() + 
+    facet_grid(~County) + 
+    theme_bw() +
+    ggtitle("New daily COVID cases in 3 counties of Pennsylvania")
+
+MS <- covid_rate %>%
+  filter(State %in% c("Massachusetts"),
+         County %in% c("Suffolk", "Barnstable", "Middlesex")) %>%
+  ggplot(aes(x = date, y = cum_cases, color = County)) + 
+    geom_point() + 
+    facet_grid(~County) + 
+    theme_bw() +
+    ggtitle("New daily COVID cases in 3 counties of Massachusetts")
+
+ggpubr::ggarrange(PA, MS, nrow = 2)
+
+
+# plot the county_new_cases for a few counties to illustrate negative values (this should technically not be possible)
+PA <- covid_rate %>%
+  filter(State %in% c("Pennsylvania"),
+         County %in% c("Lancaster", "Allegheny", "Philadelphia")) %>%
+  ggplot(aes(x = date, y = county_new_cases, color = County)) + 
+    geom_point() + 
+    facet_grid(~County) + 
+    theme_bw() +
+    ggtitle("New daily COVID cases in 3 counties of Pennsylvania")
+
+MS <- covid_rate %>%
+  filter(State %in% c("Massachusetts"),
+         County %in% c("Suffolk", "Barnstable", "Middlesex")) %>%
+  ggplot(aes(x = date, y = county_new_cases, color = County)) + 
+    geom_point() + 
+    facet_grid(~County) + 
+    theme_bw() +
+    ggtitle("New daily COVID cases in 3 counties of Massachusetts")
+
+ggpubr::ggarrange(PA, MS, nrow = 2)
+
 ```
 
 
 ii) Create **weekly new** cases per 100k `weekly_case_per100k`. Plot the spaghetti plots of `weekly_case_per100k` by state. Use `TotalPopEst2019` as population.
+
+```{r}
+
+
+```
+
 
 iii) Summarize the COVID case trend among states based on the plot in ii). What could be the possible reasons to explain the variabilities? 
 
