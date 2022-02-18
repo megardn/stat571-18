@@ -145,8 +145,9 @@ First, we start by creating a `county_new_cases` variable, defined as the row-wi
 ```{r fig.width=6}
 # create county_new_cases variable
 covid_rate <- covid_rate %>%
-  group_by(County) %>%
+  group_by(County, State) %>%
   mutate(county_new_cases = cum_cases - lag(cum_cases))
+
 
 # the first new_cases entry for every county is an NA as there was no prior data point to compute a difference with. Thus, we replace NAs with the first reported number of cases that day. 
 covid_rate$county_new_cases <- ifelse(is.na(covid_rate$county_new_cases), covid_rate$cum_cases, covid_rate$county_new_cases)
@@ -156,6 +157,7 @@ summary(covid_rate$county_new_cases)
 
 # some values are very negative! Let's see which: 
 covid_rate[which(covid_rate$county_new_cases < -3000), ]
+
 
 # it looks like the negative values happen at the first recorded date for certain counties. Not sure why?? Replacing negative value with the cumulative cases value (as this is the first day, we can take this value as is)
 covid_rate$county_new_cases <- ifelse((covid_rate$county_new_cases)<0, covid_rate$cum_cases, covid_rate$county_new_cases)
