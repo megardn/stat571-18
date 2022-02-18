@@ -1,9 +1,9 @@
 ---
-title: "COVID-19 Case Study"
+title: "COVID-19 Case Study, HW3 GROUP 18"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Davila
+- Margaret Gardner
+- Joelle Bagautdinova
 date: 'Due before midnight, Feb 27'
 output:
   html_document:
@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime)
+               plotly, ggpubr, vistime, skimr)
 ```
 
 # Background
@@ -96,6 +96,44 @@ covid_rate <- fread("data/covid_rates.csv")
 ## Understand the data
 
 The detailed description of variables is in `Appendix 1: Data description`. Please get familiar with the variables. Summarize the two data briefly.
+
+```{r}
+# explore county data
+head(county_data)
+dim(county_data)
+# str(county_data)
+# summary(county_data)
+skim(county_data)
+
+# explore covid_rate
+head(covid_rate)
+dim(covid_rate)
+# str(covid_rate)
+# summary(covid_rate)
+skim(covid_rate)
+
+```
+  
+Based on this summary, we note that:
+
+* A number of variables in the `county_data` contain NAs.
+* The `covid_rate` dataset does not contain any NAs.
+* County and State are character variables; we will change these to factors for further analyses. 
+
+```{r}
+# change county and state to factors in both datasets
+county_data <- county_data %>%
+  mutate(State = as.factor(State),
+         County = as.factor(County))
+
+covid_rate <- covid_rate %>%
+  mutate(State = as.factor(State),
+         County = as.factor(County))
+
+```
+
+
+
 
 ## COVID case trend
 
