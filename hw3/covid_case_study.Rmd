@@ -327,7 +327,7 @@ covid_rate$MONTH <- month.abb[covid_rate$MONTH] # convert to month names
 # Here I extract just the data from 2020
 covid_rate_2020 <- covid_rate[covid_rate$YEAR == 2020, ]
 
-# Create a daily deaths variable
+# Create a daily deaths per 
 covid_rate_2020 <- covid_rate_2020 %>%
   group_by(County, State) %>%
   mutate(county_new_deaths = cum_deaths - lag(cum_deaths))  %>%
@@ -340,10 +340,14 @@ covid_rate_2020$county_new_deaths <- ifelse((covid_rate_2020$county_new_deaths) 
                                       covid_rate_2020$county_new_deaths) # else, just report the current value
 summary(covid_rate_2020$county_new_deaths) # looks like we're in good shape!
 
+# let's now get deaths per 100k population
+covid_rate_2020 <- covid_rate_2020 %>% 
+  mutate(deaths_per_100k = county_new_deaths/(state_pop/100000))
+
 # now, let's create a new data table with just new deaths per month by state (rows: state, columns: months)
 covid_deaths_2020 <- covid_rate_2020 %>% 
   group_by(State, MONTH) %>%
-  summarize(deaths = sum(county_new_deaths))
+  summarize(deaths = sum(deaths_per_100k))
 covid_deaths_2020$MONTH <- factor(covid_deaths_2020$MONTH, levels = c(month.abb[1:12])) # make months factors and reorder. This will help later when using facet_wrap so that months are displayed in order
 
 # now we can generate our heatmaps
@@ -352,8 +356,8 @@ colnames(covid_deaths_2020)[1] = 'state' # lowercase to match what plot_usmap ex
 
 # create a plot for month
 plot_usmap(data = covid_deaths_2020, values = "deaths", regions = 'states', color = 'black', include = unique(covid_deaths_2020$state)) + 
-scale_fill_continuous(low = "white", high = "red4", name = "COVID-19 Deaths", limits = c(0, max_deaths)) + 
-labs(title = "COVID-19 Deaths Month-by-Month") + 
+scale_fill_continuous(low = "white", high = "red4", name = "COVID-19 Deaths per 100k", limits = c(0, max_deaths)) + 
+labs(title = "COVID-19 Deaths per 100k Month-by-Month") + 
 theme(legend.position = "right") + facet_wrap(vars(MONTH))
   
 ```
