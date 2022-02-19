@@ -174,35 +174,33 @@ covid_rate$county_new_cases <- ifelse((covid_rate$county_new_cases) < 0,
                                       covid_rate$county_new_cases) # else, just report the current value
 
 summary(covid_rate$county_new_cases) # values seem reasonable now.
-tmp <- covid_rate[covid_rate$County == "Middlesex" & covid_rate$State == "Massachusetts", ]
+covid_rate[covid_rate$County == "Middlesex" & covid_rate$State == "Massachusetts", ]
 
 # this provides the number of new cases per county though, and we need to know the total sum of new daily cases per state.
 # So let's create a state_new_cases variable
-covid_rate <- covid_rate %>%
+daily_state <- covid_rate %>%
   group_by(State, date) %>%
-  mutate(state_new_cases = sum(county_new_cases, na.rm = TRUE))
+  summarise(
+    state_new_cases = sum(county_new_cases, na.rm = TRUE)
+  )
+  # mutate(state_new_cases = sum(county_new_cases, na.rm = TRUE))
 
 # let's see if this new variable seems right
-summary(covid_rate$state_new_cases) # seems reasonable, no negative values
-covid_rate %>%
-  filter(State %in% "Florida") %>%
-  group_by(date) %>%
-  summarise(
-    total_new_cases = sum(county_new_cases, na.rm = TRUE)
-  )
-
-tmp <- covid_rate[covid_rate$date == "2020-03-20" & covid_rate$State == "Florida", ]
+summary(daily_state$state_new_cases) # seems reasonable, no negative values
+tmp <- covid_rate[covid_rate$date == "2020-03-13" & covid_rate$State == "Alabama", ]
 sum(tmp$county_new_cases)
 # the variable seems correct.
 
 ```
+
+
 ```{r fig.width=6}
 # plot new daily covid cases in NY, WA and FL
-covid_rate %>%
+daily_state %>%
   filter(State %in% c("New York", "Washington", "Florida")) %>%
   ggplot(aes(x = date, y = state_new_cases, color = State)) + 
     geom_point() + 
-    facet_grid(~State) + 
+    facet_grid(~State) +
     theme_bw() +
     ggtitle("New daily COVID cases in Florida, New York and Washington")
 
@@ -230,38 +228,88 @@ ggpubr::ggarrange(PA, MS, nrow = 2)
 
 
 # plot the county_new_cases for a few counties to illustrate negative values (this should technically not be possible)
-PA <- covid_rate %>%
-  filter(State %in% c("Pennsylvania"),
-         County %in% c("Lancaster", "Allegheny", "Philadelphia")) %>%
-  ggplot(aes(x = date, y = county_new_cases, color = County)) + 
-    geom_point() + 
-    facet_grid(~County) + 
-    theme_bw() +
-    ggtitle("New daily COVID cases in 3 counties of Pennsylvania")
-
-MS <- covid_rate %>%
-  filter(State %in% c("Massachusetts"),
-         County %in% c("Suffolk", "Barnstable", "Middlesex")) %>%
-  ggplot(aes(x = date, y = county_new_cases, color = County)) + 
-    geom_point() + 
-    facet_grid(~County) + 
-    theme_bw() +
-    ggtitle("New daily COVID cases in 3 counties of Massachusetts")
-
-ggpubr::ggarrange(PA, MS, nrow = 2)
+# PA <- covid_rate %>%
+#   filter(State %in% c("Pennsylvania"),
+#          County %in% c("Lancaster", "Allegheny", "Philadelphia")) %>%
+#   ggplot(aes(x = date, y = county_new_cases, color = County)) + 
+#     geom_point() + 
+#     facet_grid(~County) + 
+#     theme_bw() +
+#     ggtitle("New daily COVID cases in 3 counties of Pennsylvania")
+# 
+# MS <- covid_rate %>%
+#   filter(State %in% c("Massachusetts"),
+#          County %in% c("Suffolk", "Barnstable", "Middlesex")) %>%
+#   ggplot(aes(x = date, y = county_new_cases, color = County)) + 
+#     geom_point() + 
+#     facet_grid(~County) + 
+#     theme_bw() +
+#     ggtitle("New daily COVID cases in 3 counties of Massachusetts")
+# 
+# ggpubr::ggarrange(PA, MS, nrow = 2)
 
 ```
 
 
+When using single day data, there is more variability in the number of new cases, making the trends harder to see. For instance, some days have close to 0 new cases, while other days contains up to 20000 new cases (Florida in January 2021). Thus, looking at the evolution of cases on a daily level may be too granular to get a good sense of COVID trends over time.  
+
 ii) Create **weekly new** cases per 100k `weekly_case_per100k`. Plot the spaghetti plots of `weekly_case_per100k` by state. Use `TotalPopEst2019` as population.
 
-```{r}
+We want to know the number of new cases per week and per 100k in each state. To do this, we sum the new cases up per state and week, divide it by the total population and then by 100'000. 
 
+```{r fig.width=8}
+
+# create total state population variable
+total_pop <- covid_rate %>%
+  group_by(County, State) %>%
+  filter(row_number() == 1) %>%
+  group_by(State) %>%
+  mutate(state_pop = sum(TotalPopEst2019)) %>%
+  select(FIPS, state_pop)
+
+# merge to main dataframe
+covid_rate <- merge(covid_rate, total_pop, all.x= T)
+
+# create weekly new cases per state and per 100k
+weekly_state <- covid_rate %>%
+  group_by(State, week) %>%
+  summarise(
+    state_weekly_new = sum(county_new_cases, na.rm = TRUE), 
+    weekly_case_per100k = state_weekly_new / first(state_pop) / 100000
+  )
+
+
+# spaghetti plot of weekly_case_per100k for all States
+weekly_state %>%
+  ggplot(aes(x = week, y = weekly_case_per100k, color = State)) + 
+    geom_line() + 
+    theme_bw() +
+    ggtitle("Weekly new cases per 100k in all States") +
+    theme(legend.position="bottom")
+
+# spaghetti plot of weekly_case_per100k for NY, FL, WA
+weekly_state %>%
+  filter(State %in% c("New York", "Washington", "Florida")) %>%
+  ggplot(aes(x = week, y = weekly_case_per100k, color = State)) + 
+    geom_line() + 
+    theme_bw() +
+    ggtitle("Weekly new cases per 100k in Florida, New York and Washington") +
+    theme(legend.position="bottom")
 
 ```
 
 
 iii) Summarize the COVID case trend among states based on the plot in ii). What could be the possible reasons to explain the variabilities? 
+
+In general, across all States we note 3-4 major waves across this time period: 
+* Around week 10, corresponding to end of March, 2020
+* Around week 25, corresponding to early July, 2020
+* Around week 42 (major peak), corresponding to early November 2020
+* Around week 46, corresponding to early December 2020
+
+When plotting Washington, Florida and New York only, we note that while all 3 States had a wave of COVID cases in early December, New York had its own wave around week 10-11 (end of March, 2020) and Florida had its own wave around week 25-26 (July 2020).
+
+These observations are likely due to a combination of changes in restrictions as well as major holidays and tourism/population flow. For instance, New York may have been initially more heavily impacted at the start of the pandemic in March 2020 due to the high number of travellers passing through NYC. Florida was more affected in summer, as its beaches attract more tourists. Finally, all States were impacted in early December as a consequence of gatherings during Thanksgiving. 
 
 iv) (Optional) Use `covid_intervention` to see whether the effectiveness of lockdown in flattening the curve.
 
