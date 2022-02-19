@@ -194,7 +194,7 @@ sum(tmp$county_new_cases)
 ```
 
 
-```{r fig.width=6}
+```{r fig.width=10}
 # plot new daily covid cases in NY, WA and FL
 daily_state %>%
   filter(State %in% c("New York", "Washington", "Florida")) %>%
@@ -316,6 +316,47 @@ iv) (Optional) Use `covid_intervention` to see whether the effectiveness of lock
 ## COVID death trend
 
 i) For each month in 2020, plot the monthly deaths per 100k heatmap by state on US map. Use the same color range across months. (Hints: Set `limits` argument in `scale_fill_gradient()` or use `facet_wrap()`; use `lubridate::month()` and `lubridate::year()` to extract month and year from date; use `tidyr::complete(state, month, fill = list(new_case_per100k = NA))` to complete the missing months with no cases.)
+
+```{r, fig.width=15}
+# I'll first create a month and year variable for each row. This will help us pick out what we need.
+covid_rate <- covid_rate %>%
+  mutate(YEAR = lubridate::year(date)) %>%
+  mutate(MONTH = lubridate::month(date))
+covid_rate$MONTH <- month.abb[covid_rate$MONTH] # convert to month names
+
+# Here I extract just the data from 2020
+covid_rate_2020 <- covid_rate[covid_rate$YEAR == 2020, ]
+
+# Create a daily deaths variable
+covid_rate_2020 <- covid_rate_2020 %>%
+  group_by(County, State) %>%
+  mutate(county_new_deaths = cum_deaths - lag(cum_deaths))  %>%
+  mutate(county_new_deaths = ifelse(is.na(county_new_deaths), cum_deaths, county_new_deaths)) # the first county_new_deaths entry for every county is an NA as there was no prior data point to compute a difference with. Thus, we replace NAs with the first reported number of deaths that day. 
+
+summary(covid_rate_2020$county_new_deaths) # again, we see that some are negative - this is due to later cum_deaths being less than preceding ones. This is likely due to correcting misreporting or errors in data entry. 
+# To account for this, set negative values to zero. 
+covid_rate_2020$county_new_deaths <- ifelse((covid_rate_2020$county_new_deaths) < 0, 
+                                      0, # if value is smaller than 0, attribute 0 to this cell
+                                      covid_rate_2020$county_new_deaths) # else, just report the current value
+summary(covid_rate_2020$county_new_deaths) # looks like we're in good shape!
+
+# now, let's create a new data table with just new deaths per month by state (rows: state, columns: months)
+covid_deaths_2020 <- covid_rate_2020 %>% 
+  group_by(State, MONTH) %>%
+  summarize(deaths = sum(county_new_deaths))
+covid_deaths_2020$MONTH <- factor(covid_deaths_2020$MONTH, levels = c(month.abb[1:12])) # make months factors and reorder. This will help later when using facet_wrap so that months are displayed in order
+
+# now we can generate our heatmaps
+max_deaths <- max(covid_deaths_2020$deaths) # get the upper limit for our color gradient
+colnames(covid_deaths_2020)[1] = 'state' # lowercase to match what plot_usmap expects
+
+# create a plot for month
+plot_usmap(data = covid_deaths_2020, values = "deaths", regions = 'states', color = 'black', include = unique(covid_deaths_2020$state)) + 
+scale_fill_continuous(low = "white", high = "red4", name = "COVID-19 Deaths", limits = c(0, max_deaths)) + 
+labs(title = "COVID-19 Deaths Month-by-Month") + 
+theme(legend.position = "right") + facet_wrap(vars(MONTH))
+  
+```
 
 ii) (Optional) Use `plotly` to animate the monthly maps in i). Does it reveal any systematic way to capture the dynamic changes among states? (Hints: Follow *Appendix 3: Plotly heatmap::* in Module 6 regularization lecture to plot the heatmap using `plotly`. Use `frame` argument in `add_trace()` for animation. `plotly` only recognizes abbreviation of state names. Use `unique(us_map(regions = "states") %>% select(abbr, full))` to get the abbreviation and merge with the data to get state abbreviation.)
 
