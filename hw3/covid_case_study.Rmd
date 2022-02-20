@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime, skimr)
+               plotly, ggpubr, vistime, skimr, tidyr)
 ```
 
 # Background
@@ -291,7 +291,7 @@ weekly_state %>%
 weekly_state %>%
   filter(State %in% c("New York", "Washington", "Florida")) %>%
   ggplot(aes(x = week, y = weekly_case_per100k, color = State)) + 
-    geom_line() + 
+    geom_line(size = 2) + 
     theme_bw() +
     ggtitle("Weekly new cases per 100k in Florida, New York and Washington") +
     theme(legend.position="bottom")
@@ -350,19 +350,75 @@ covid_deaths_2020 <- covid_rate_2020 %>%
   summarize(deaths = sum(deaths_per_100k))
 covid_deaths_2020$MONTH <- factor(covid_deaths_2020$MONTH, levels = c(month.abb[1:12])) # make months factors and reorder. This will help later when using facet_wrap so that months are displayed in order
 
+# filling missing months with NA
+covid_deaths_2020 <- covid_deaths_2020 %>% 
+  group_by(State) %>% 
+  complete(MONTH) %>% 
+  ungroup()
+
 # now we can generate our heatmaps
 max_deaths <- max(covid_deaths_2020$deaths) # get the upper limit for our color gradient
 colnames(covid_deaths_2020)[1] = 'state' # lowercase to match what plot_usmap expects
 
 # create a plot for month
-plot_usmap(data = covid_deaths_2020, values = "deaths", regions = 'states', color = 'black', include = unique(covid_deaths_2020$state)) + 
-scale_fill_continuous(low = "white", high = "red4", name = "COVID-19 Deaths per 100k", limits = c(0, max_deaths)) + 
-labs(title = "COVID-19 Deaths per 100k Month-by-Month") + 
-theme(legend.position = "right") + facet_wrap(vars(MONTH))
+covid_map <- plot_usmap(data = covid_deaths_2020, values = "deaths", regions = 'states', color = 'black', include = unique(covid_deaths_2020$state)) + 
+  scale_fill_continuous(low = "white", high = "red4", name = "COVID-19 Deaths per 100k", limits = c(0, max_deaths)) + 
+  labs(title = "COVID-19 Deaths per 100k Month-by-Month") + 
+  theme(legend.position = "right") + facet_wrap(vars(MONTH))
+covid_map
+
+# ggplotly(covid_map, text = paste("Cases:", NAME_1))
   
 ```
 
 ii) (Optional) Use `plotly` to animate the monthly maps in i). Does it reveal any systematic way to capture the dynamic changes among states? (Hints: Follow *Appendix 3: Plotly heatmap::* in Module 6 regularization lecture to plot the heatmap using `plotly`. Use `frame` argument in `add_trace()` for animation. `plotly` only recognizes abbreviation of state names. Use `unique(us_map(regions = "states") %>% select(abbr, full))` to get the abbreviation and merge with the data to get state abbreviation.)
+
+
+```{r results='show', warning=FALSE, cache=FALSE}
+
+# get US state abbreviations
+state_abbr <- unique(us_map(regions = "states") %>% select(abbr, full))
+
+# rename full to state
+state_abbr <- state_abbr %>%
+  rename(state = full)
+
+# merge with main dataframe
+covid_deaths_2020 <- merge(covid_deaths_2020,
+             state_abbr,
+             all.x = T)
+
+# add a variable hover to store the state description as text when you hover on a state
+# <br> means new line in HTML
+plotting_info <- covid_deaths_2020 %>% 
+  mutate(hover =  paste(state, '<br>',
+                        'Deaths per 100k: ', round(deaths, 1)))
+# give state boundaries a white border
+l <- list(color = toRGB("white"), width = 2)
+# specify some map projection/options
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = FALSE
+)
+
+fig <- plot_geo(plotting_info, locationmode = 'USA-states')
+fig <- fig %>% add_trace(
+    z = ~deaths, text = ~hover, locations = ~abbr,
+    color = ~deaths, colors = 'Reds',
+    zmin = 0, zmax = max_deaths,
+    frame = ~MONTH
+  )
+
+fig <- fig %>% layout(
+    title = 'COVID-19 Deaths per 100',
+    geo = g,
+    hoverlabel = list(bgcolor = "black")
+  )
+
+fig
+```
+
 
 # COVID factor
 
