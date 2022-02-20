@@ -411,13 +411,15 @@ fig <- fig %>% add_trace(
   )
 
 fig <- fig %>% layout(
-    title = 'COVID-19 Deaths per 100',
+    title = 'COVID-19 Deaths per 100k',
     geo = g,
     hoverlabel = list(bgcolor = "black")
   )
 
 fig
 ```
+
+It does reveal how the COVID wave spreads primarily from states with high international travel and large urban centers, through neighboring states, and settles in rural states last. 
 
 
 # COVID factor
