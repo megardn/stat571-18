@@ -428,6 +428,29 @@ We now try to build a good parsimonious model to find possible factors related t
 
 i) Create the response variable `total_death_per100k` as the total of number of COVID deaths per 100k by *Feb 1, 2021*. We suggest to take log transformation as `log_total_death_per100k = log(total_death_per100k + 1)`. Merge `total_death_per100k` to `county_data` for the following analysis.
 
+```{r}
+# let's create a response variable. We'll use the log transformed deaths in our analysis. 
+head(covid_rate)
+head(county_data)
+
+# get just data for Feb 1 2021 
+feb1_data <- covid_rate[covid_rate$date == as.Date("2021-01-02"), ]
+
+# create a total_death_per100k variable. Here we'll be using county population to make our calculation, as we're working at the county level. 
+feb1_data <- feb1_data %>%
+  mutate(total_death_per100k = cum_deaths/(TotalPopEst2019/100000))
+# now, we can derive a log transform of our variable
+feb1_data <- feb1_data %>%
+  mutate(log_total_death_per100k = log(total_death_per100k + 1))
+
+# Append to the county_data data.frame. We'll use the FIPS code to link the new variables to the correct county.
+county_data <- merge(x=county_data, y=feb1_data[, c("FIPS", "total_death_per100k", "log_total_death_per100k")], by="FIPS", all.x=TRUE)
+
+summary(county_data[, c("total_death_per100k", "log_total_death_per100k")]) # let's take a look at our new appended variables ot make sure everything is ok. Looks like we have some NAs, though this is expected because there are more counties in county_data than in covid_rate. 
+length(unique(covid_rate$FIPS)) < length(county_data$FIPS)
+
+```
+
 ii) Select possible variables in `county_data` as covariates. We provide `county_data_sub`, a subset variables from `county_data`, for you to get started. Please add any potential variables as you wish. 
 
     a) Report missing values in your final subset of variables. 
