@@ -275,7 +275,7 @@ weekly_state <- covid_rate %>%
   group_by(State, week) %>%
   summarise(
     state_weekly_new = sum(county_new_cases, na.rm = TRUE), 
-    weekly_case_per100k = state_weekly_new / first(state_pop) / 100000
+    weekly_case_per100k = state_weekly_new / (first(state_pop) / 100000)
   )
 
 
