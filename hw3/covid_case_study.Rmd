@@ -430,9 +430,6 @@ i) Create the response variable `total_death_per100k` as the total of number of 
 
 ```{r}
 # let's create a response variable. We'll use the log transformed deaths in our analysis. 
-head(covid_rate)
-head(county_data)
-
 # get just data for Feb 1 2021 
 feb1_data <- covid_rate[covid_rate$date == as.Date("2021-01-02"), ]
 
