@@ -1,9 +1,9 @@
 ---
 title: "Modern Data Mining, HW 3"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Davila
+- Margaret Gardner
+- Joelle Bagautdinova
 date: 'Due: 11:59Pm,  2/27, 2022'
 output:
   pdf_document:
@@ -77,15 +77,35 @@ Review the code and concepts covered during lectures: multiple regression, model
 
 # Case study 1:  `ISLR::Auto` data
 
-This will be the last part of the Auto data from ISLR. The original data contains 408 observations about cars. It has some similarity as the Cars data that we use in our lectures. To get the data, first install the package `ISLR`. The data set `Auto` should be loaded automatically. We use this case to go through methods learned so far. 
+This will be the last part of the Auto data from ISLR. The original data contains 408 observations about cars. It has some similarity as the Cars data that we use in our lectures. To get the data, first install the package `ISLR`. The data set `Auto` should be loaded automatically. We use this case to go through methods learned so far. Final modelling question: We want to explore the effects of each feature as best as possible. 
 
-Final modelling question: We want to explore the effects of each feature as best as possible. 
+1) Preparing variables:
 
-1) Preparing variables: 
+``` {r clean.auto}
+#loading data
+auto <- ISLR::Auto
+#seeing what's there
+str(auto)
+summary(auto)
+sum(is.na(auto))
 
-a) You may explore the possibility of variable transformations. We normally do not suggest to transform $x$ for the purpose of interpretation. You may consider to transform $y$ to either correct the violation of the linear model assumptions or if you feel a transformation of $y$ makes more sense from some theory. In this case we suggest you to look into `GPM=1/MPG`. Compare residual plots of MPG or GPM as responses and see which one might yield a more satisfactory patterns. 
+#recoding as factors
+auto <- auto %>% mutate(cylinders = as.factor(cylinders),
+         origin = as.factor(origin),
+         origin = recode_factor(origin, "1" = "American", 
+                                "2" = "European",
+                                "3" = "Japanese"))
+#skim data
+skim(auto)
 
-In addition, can you provide some background knowledge to support the notion: it makes more sense to model `GPM`?  
+#look for correlations
+auto %>% select_if(is.numeric) %>%
+  ggpairs()
+```
+
+Overall, the data is fairly clean with no missing values, as seen above. MPG has strong negative correlations with displacement, weight, horsepower; each of these independent variables also has a strong, positive correlation with the other two factors. All correlations modeled are significant at the level of p < 0.001.
+
+a) You may explore the possibility of variable transformations. We normally do not suggest to transform $x$ for the purpose of interpretation. You may consider to transform $y$ to either correct the violation of the linear model assumptions or if you feel a transformation of $y$ makes more sense from some theory. In this case we suggest you to look into `GPM=1/MPG`. *Compare residual plots of MPG or GPM as responses and see which one might yield a more satisfactory patterns*. In addition, can you provide some background knowledge to support the notion: it makes more sense to model `GPM`?  
 
 b) You may also explore by adding interactions and higher order terms. The model(s) should be as *parsimonious* (simple) as possible, unless the gain in accuracy is significant from your point of view. 
 
