@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime, skimr, tidyr)
+               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix)
 ```
 
 # Background
@@ -454,14 +454,98 @@ ii) Select possible variables in `county_data` as covariates. We provide `county
 
     b) In the following anaylsis, you may ignore the missing values.
 
+We are adding AvgHHSize, indicating the average household size, as crowdedness within households may potentially have an influence on COVID spreading. 
+
 ```{r}
 county_data_sub <- county_data %>%
-  select(County, State, FIPS, Deep_Pov_All, PovertyAllAgesPct, PerCapitaInc, UnempRate2019, PctEmpFIRE, PctEmpConstruction, PctEmpTrans, PctEmpMining, PctEmpTrade, PctEmpInformation, PctEmpAgriculture, PctEmpManufacturing, PctEmpServices, PopDensity2010, OwnHomePct, Age65AndOlderPct2010, TotalPop25Plus, Under18Pct2010, Ed2HSDiplomaOnlyPct, Ed3SomeCollegePct, Ed4AssocDegreePct, Ed5CollegePlusPct, ForeignBornPct, Net_International_Migration_Rate_2010_2019, NetMigrationRate1019, NaturalChangeRate1019, TotalPopEst2019, WhiteNonHispanicPct2010, NativeAmericanNonHispanicPct2010, BlackNonHispanicPct2010, AsianNonHispanicPct2010, HispanicPct2010, Type_2015_Update, RuralUrbanContinuumCode2013, UrbanInfluenceCode2013, Perpov_1980_0711, HiCreativeClass2000, HiAmenity, Retirement_Destination_2015_Update)
+  select(County, State, FIPS, # general info
+         Deep_Pov_All, PovertyAllAgesPct, PerCapitaInc, # income/poverty
+         UnempRate2019, PctEmpFIRE, PctEmpConstruction, PctEmpTrans, PctEmpMining, PctEmpTrade, PctEmpInformation, PctEmpAgriculture, PctEmpManufacturing, PctEmpServices, # employment
+         PopDensity2010, OwnHomePct, AvgHHSize, # housing (adding AvgHHSize here as crowdedness may have an influence on COVID spreading?)
+         Age65AndOlderPct2010, TotalPop25Plus, Under18Pct2010, # age
+         Ed2HSDiplomaOnlyPct, Ed3SomeCollegePct, Ed4AssocDegreePct, Ed5CollegePlusPct, # education
+         ForeignBornPct, Net_International_Migration_Rate_2010_2019, NetMigrationRate1019, # migration
+         NaturalChangeRate1019, TotalPopEst2019, # population size
+         WhiteNonHispanicPct2010, NativeAmericanNonHispanicPct2010, BlackNonHispanicPct2010, AsianNonHispanicPct2010, HispanicPct2010, # race & ethnicity
+         Type_2015_Update, RuralUrbanContinuumCode2013, UrbanInfluenceCode2013, # county type (rural vs urban)
+         Perpov_1980_0711, # persistent poverty counties
+         HiCreativeClass2000, HiAmenity, Retirement_Destination_2015_Update, # other
+         log_total_death_per100k) # dependent variable
+
+# get a sense of the data subset
+skim(county_data_sub)
+
 ```
+
+Most variables have a number of missing values (ranging from around 5-170 NAs). As instructed, we will ignore these in building our model.  
 
 iii) Use LASSO to choose a parsimonious model with all available sensible county-level information. **Force in State** in the process. Why we need to force in State? You may use `lambda.1se` to choose a smaller model. 
 
+State should be forced into the model because this is a critical variable of interest in our study. To avoid potentially discarding it, we use the `penalty.factor` argument from `cv.glmnet` to not impose any penalty on the coefficients of this variable.  
+
+```{r}
+
+# remove county variable as we don't want to include this in the model
+county_data_sub <- county_data_sub %>%
+  select(-County)
+
+# remove all rows containing NAs (LASSO does not work without this step)
+county_data_sub <- na.omit(county_data_sub)
+
+# create matrices to feed into gmnet
+Y <- as.matrix(county_data_sub[, 43]) # extract Y (log_total_death_per100k)
+X <- model.matrix(log_total_death_per100k~., data = county_data_sub)[, -1] # remove the first (interecept) column with only 1s
+
+# checking data types (should be matrices)
+# typeof(X)
+# typeof(Y)
+
+# to control the randomness in K folds 
+set.seed(10)  
+
+# building the penalty factor
+length(levels(county_data_sub$State))
+ncol(X)
+length(c(rep(0, 53), rep(1, ncol(X)-53))) # repeat 0 for each of the 53 States (not penalized), repeat 1 for other variables (penalized)
+
+# run LASSO
+lasso_cv <- cv.glmnet(X, Y, alpha = 1, nfolds = 10, intercept = TRUE,
+                       penalty.factor = c(rep(0, 53), rep(1, ncol(X)-53)))  
+
+# plot LASSO results
+plot(lasso_cv)
+
+fit.fl.cv$lambda.1se # use lambda.1se to select the smaller model
+coef.1se <- coef(lasso_cv, s = "lambda.1se") # get coefficients
+coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coefficients
+
+# output variable names
+coef.1se <- rownames(as.matrix(coef.1se))[-1] 
+coef.1se
+
+```
+
+
 iv) Use `Cp` or BIC to fine tune the LASSO model from iii). Again **force in State** in the process. 
+
+```{r}
+# let's first see what the linear model looks like based on variables selected by LASSO
+coef.1se <- coef(lasso_cv, s="lambda.1se")  #s=c("lambda.1se","lambda.min") or lambda value
+coef.1se <- coef.1se[which(coef.1se != 0),]   # get the non=zero coefficients
+var.1se <- rownames(as.matrix(coef.1se))[-1] # output the variable names without intercept
+var.1se <- var.1se[-grep("State", var.1se)] # remove the state levels
+county_data_lasso <-  county_data_sub %>%
+  select(c("State", "log_total_death_per100k", var.1se)) # get a subset with response and LASSO output
+
+# run relaxed LASSO
+fit.1se.lm <- lm(log_total_death_per100k~., data = county_data_lasso) 
+summary(fit.1se.lm) 
+
+
+### TO DO: use Cp or BIC to finetune the LASSO model. 
+
+```
+
 
 v) If necessary, reduce the model from iv) to a final model with all variables being significant at 0.05 level. Are the linear model assumptions all reasonably met?
 
