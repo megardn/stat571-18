@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix)
+               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix, leaps)
 ```
 
 # Background
@@ -488,13 +488,13 @@ State should be forced into the model because this is a critical variable of int
 
 # remove county variable as we don't want to include this in the model
 county_data_sub <- county_data_sub %>%
-  select(-County)
+  select(-County, -FIPS)
 
 # remove all rows containing NAs (LASSO does not work without this step)
 county_data_sub <- na.omit(county_data_sub)
 
 # create matrices to feed into gmnet
-Y <- as.matrix(county_data_sub[, 43]) # extract Y (log_total_death_per100k)
+Y <- as.matrix(county_data_sub[, 42]) # extract Y (log_total_death_per100k)
 X <- model.matrix(log_total_death_per100k~., data = county_data_sub)[, -1] # remove the first (interecept) column with only 1s
 
 # checking data types (should be matrices)
@@ -516,7 +516,7 @@ lasso_cv <- cv.glmnet(X, Y, alpha = 1, nfolds = 10, intercept = TRUE,
 # plot LASSO results
 plot(lasso_cv)
 
-fit.fl.cv$lambda.1se # use lambda.1se to select the smaller model
+lasso_cv$lambda.1se # use lambda.1se to select the smaller model
 coef.1se <- coef(lasso_cv, s = "lambda.1se") # get coefficients
 coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coefficients
 
@@ -525,7 +525,6 @@ coef.1se <- rownames(as.matrix(coef.1se))[-1]
 coef.1se
 
 ```
-
 
 iv) Use `Cp` or BIC to fine tune the LASSO model from iii). Again **force in State** in the process. 
 
@@ -543,7 +542,19 @@ fit.1se.lm <- lm(log_total_death_per100k~., data = county_data_lasso)
 summary(fit.1se.lm) 
 
 
-### TO DO: use Cp or BIC to finetune the LASSO model. 
+### TO DO: use Cp or BIC to fine-tune the LASSO model.
+county_data_lasso <- data.frame(county_data_lasso) # convert from data.table to data.frame
+county_data_lasso_sub <- county_data_lasso[ ,c("log_total_death_per100k", var.1se)] # extract response & LASSO output vars
+county_data_lasso_fine_tune <- regsubsets(log_total_death_per100k ~., nvmax = 17, method = "exhau", county_data_lasso_sub) # get Cp and BIC
+# Plot the Cp and BIC
+plot(summary(county_data_lasso_fine_tune)$cp)
+plot(summary(county_data_lasso_fine_tune)$bic)
+
+optimal_size = 9 # 9 Seems to be a good number 
+final_variables <- colnames(summary(county_data_lasso_fine_tune)$which)[summary(county_data_lasso_fine_tune)$which[optimal_size, ]][-1] # extract the variables in the optimal model, minus the intercept
+county_data_sub <- data.frame(county_data_sub) # convert to data.frame from data.table
+final_covid_fit <- lm(log_total_death_per100k ~., data = county_data_sub[, c("log_total_death_per100k", final_variables)])
+summary(final_covid_fit)
 
 ```
 
