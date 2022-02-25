@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix, leaps)
+               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix, leaps, car)
 ```
 
 # Background
@@ -553,13 +553,16 @@ plot(summary(county_data_lasso_fine_tune)$bic)
 optimal_size = 9 # 9 Seems to be a good number 
 final_variables <- colnames(summary(county_data_lasso_fine_tune)$which)[summary(county_data_lasso_fine_tune)$which[optimal_size, ]][-1] # extract the variables in the optimal model, minus the intercept
 county_data_sub <- data.frame(county_data_sub) # convert to data.frame from data.table
-final_covid_fit <- lm(log_total_death_per100k ~., data = county_data_sub[, c("log_total_death_per100k", final_variables)])
+final_covid_fit <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso[, c("log_total_death_per100k", final_variables, 'State')]))
 summary(final_covid_fit)
-
+Anova(final_covid_fit)
 ```
 
 
 v) If necessary, reduce the model from iv) to a final model with all variables being significant at 0.05 level. Are the linear model assumptions all reasonably met?
+```{r}
+plot(final_covid_fit)
+```
 
 vi) It has been shown that COVID affects elderly the most. It is also claimed that the COVID death rate among African Americans and Latinos is higher. Does your analysis support these arguments?
 
