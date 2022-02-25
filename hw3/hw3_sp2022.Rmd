@@ -179,7 +179,7 @@ Based on the correlation plot outputs, the predictor variables look like they ha
 
 b) You may also explore by adding interactions and higher order terms. The model(s) should be as *parsimonious* (simple) as possible, unless the gain in accuracy is significant from your point of view. 
 
-From the correlation plots, there do not appear to be any higher-order relationships with gpm. We will test several models though for interaction effects, namely with origin, year, and cylinders, since each could feasibly have an in interaction with the car's efficiency at a given horespower, weight, acceleration or displacement; year and cylinders since this could affect the mechanics used in the car to achieve a given performance and origin since cars manufactured in different locations could be made differently/adhere to different efficiency standards.
+From the correlation plots, there do not appear to be any higher-order relationships with gpm. *add plots if people want* We will test several models though for interaction effects, namely with origin, year, and cylinders, since each could feasibly have an in interaction with the car's efficiency at a given horespower, weight, acceleration or displacement; year and cylinders since this could affect the mechanics used in the car to achieve a given performance and origin since cars manufactured in different locations could be made differently/adhere to different efficiency standards.
 
 ```{r origin.interaction}
 Anova(lm(gpm ~ horsepower + origin + horsepower*origin, auto_gpm))
@@ -229,10 +229,15 @@ plot(sum_fit.gpm$cp, xlab="Number of predictors",
 #plot BIC for fun
 plot(sum_fit.gpm$bic, xlab="Number of predictors", 
      ylab="BIC", col="red", type="p", pch=16)
-```
-Based on the elbow rule looking both at CP and BIC, d=3 is sufficient to model gpm; this also avoids the difficulties of forcing the model to include all 5 levels of the categorical cylinders predictor.
 
-Looking for interaction effects, specifically starting with two possible identified by Anova in Part B. 
+fit.exh.var <- sum_fit.gpm$which #indicators if variable is included
+#pull vars for gpm.final, d=3
+predictors <- colnames(fit.exh.var)[fit.exh.var[3,]] 
+predict_d3 <- predictors[-c(1)] #drop intercept
+```
+Based on the elbow rule looking both at CP and BIC, d=3 (`r predict_d3`) is sufficient to model gpm; this also avoids the difficulties of forcing the model to include all 5 levels of the categorical cylinders predictor.
+
+Next we'll try to account for interaction effects, specifically starting with two possible identified by Anova in Part B. 
 
 ``` {r}
 fit.gpm_int <- regsubsets(gpm ~ . + acceleration*year + horsepower*acceleration, auto_gpm , nvmax=15, method="exhaustive")
@@ -254,35 +259,93 @@ Based on the elbow rule, both the d=4 or d=5 models would be good choices for pr
 fit.exh.var_int <- sum_fit.gpm_int$which #indicators if variable is included
 #pull vars for interaction model d=4
 predictors_int4 <- colnames(fit.exh.var_int)[fit.exh.var_int[4,]] 
+predict_int4 <- predictors_int4[-c(1)]
 
 #pull vars for interaction model d=5
 predictors_int5 <- colnames(fit.exh.var_int)[fit.exh.var_int[5,]] 
+predict_int5 <- predictors_int5[-c(1)]
 ```
 
-However, both the model with 4 predictors (`r predictors_int4[-c(1)]`) and the model with 5 predictors (`rpredictors_int5[-c(1)]`) include interaction terms but not main effects for those variables (i.e. acceleration:year but not main effects of year). Additionally, the d=5 model includes only one level of a categorical variable (cylinder). Rectifying both would require forcing variables into the model, reducing the degrees of freedom and ultimately changing the criteria upon which that model was selected in the first place, $C_p$. 
+However, both the model with 4 predictors (`r predict_int4`) and the model with 5 predictors (`r predict_int5`) include interaction terms but not main effects for those variables (i.e. acceleration:year but not main effects of year). Additionally, the d=5 model includes only one level of a categorical variable (cylinder). Rectifying both would require forcing variables into the model, reducing the degrees of freedom and ultimately changing the criteria upon which that model was selected in the first place, $C_p$. 
 
-2) Describe the final model and its accuracy. Include diagnostic plots with particular focus on the model residuals.
+To resolve this, we'll compare our top contender models, the main-effects model of d=3 (modelling on `r predict_d3`) and the interaction-effects model of d=4 (modelling on `r predict_int4`) expanded to include the main effects of year and horsepower.
 
-  * Summarize the effects found.
-  * Predict the `mpg` of a car that is: built in 1983, in the US, red, 180 inches long, 8 cylinders, 350 displacement, 260 as horsepower, and weighs 4,000 pounds. Give a 95% CI.
-  * Any suggestions as to how to improve the quality of the study?
-  We may evaluate the model’s accuracy through prediction error in which case the data must be splitted into train and test dataset. In another way, we may use Mallow Cp or BIC criterion.
+``` {r}
+#main effects only
+fit.main <- lm(gpm ~ horsepower + weight + year, auto_gpm)
+Anova(fit.main)
 
+#interaction effects model
+fit.int <- lm(gpm ~ weight + acceleration + year + horsepower + acceleration*year + acceleration*horsepower, auto_gpm)
+Anova(fit.int)
+
+anova(fit.main, fit.int)
+```
+
+As anticipated, the larger model with interaction explains more of the variance, but the interaction of acceleration and year is no longer significant when year itself is forced in the model. We'll try running the model again removing this interaction term to see what happens.
+
+``` {r}
+fit.int2 <- lm(gpm ~ weight + acceleration + year + horsepower + acceleration*horsepower, auto_gpm)
+Anova(fit.int2)
+anova(fit.main, fit.int2)
+
+summary(fit.main)[9]
+summary(fit.int2)[9]
+```
+
+Based on the Adjusted $R^2$, the explanatory power gained in the interaction models over the main-effects model does not warrant the added complexity and difficulty in interpretation for our purposes. However, it is interesting to consider how acceleration grows (cars take longer to accelerate from 0 to 60 mph) the effect of horsepower on gpm increases; *why would this be happening?*
+
+Let's see what happens when we model sqrt(gpm), since that had the prettiest residuals in the full model.
+
+``` {r}
+#cp for all possible d's
+fit.sqrt_gpm <- regsubsets(sqrt.gpm ~., auto.sqrt.gpm , nvmax=15, method="exhaustive")
+sum_fit.sqrt_gpm <- summary(fit.sqrt_gpm)
+sum_fit.sqrt_gpm
+
+#plot
+plot(sum_fit.sqrt_gpm$cp, xlab="Number of predictors", 
+     ylab="Cp", col="red", pch=16)
+```
+
+2) Describe the final model and its accuracy (Cp or BIC criterion). Include diagnostic plots with particular focus on the model residuals.
 
 Modelling the residuals of final model
 
 ```{r auto.diagnostic}
-fit.exh.var <- sum_fit.gpm$which #indicators if variable is included
-#pull vars for gpm.final, d=3
-predictors <- colnames(fit.exh.var)[fit.exh.var[3,]] 
-predictors[-c(1)] #drop intercept
+#plots
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+plot(fit.main, 1, pch=16)
+abline(h=0, col="blue", lwd=2)
+plot(fit.main, 2)
 
-#create model
-gpm.final <- lm(gpm ~ horsepower + weight + year, auto_gpm)
+#plots
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+plot(fit.int2, 1, pch=16)
+abline(h=0, col="blue", lwd=2)
+plot(fit.int2, 2)
+```
 
-#diagnostics
-Anova(gpm.final)
-summary(gpm.final)
+ * Summarize the effects found.
+  * Predict the `mpg` of a car that is: built in 1983, in the US, red, 180 inches long, 8 cylinders, 350 displacement, 260 as horsepower, and weighs 4,000 pounds. Give a 95% prediction interval.
+  * Any suggestions as to how to improve the quality of the study?
+
+We create a new car for prediction:
+
+```{r newcar}
+newcar <-  auto_gpm[1, ]  # Create a new row with same structure as in auto_gpm
+#assign features
+
+newcar[1:8] <- c("8", 350, 260, 4000, NA, 83, NA, NA)
+newcar <- newcar %>% mutate(displacement = as.numeric(displacement),
+                            horsepower = as.numeric(horsepower),
+                            weight = as.numeric(weight),
+                            acceleration = as.numeric(acceleration),
+                            year = as.numeric(year),
+                            gpm = as.numeric(gpm))
+#set levels cylinders to match auto_gpm
+newcar$cylinders <- factor(newcar$cylinders, levels = c("3", "4", "5", "6", "8")) 
+newcar$origin <- factor(newcar$origin, levels = c("American", "European", "Japanese")) 
 ```
 
 # Case study 2: COVID
