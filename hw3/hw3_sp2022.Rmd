@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = T, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}
-pacman::p_load(ISLR, readxl, magrittr, dplyr, ggplot2) # add the packages needed
+pacman::p_load(ISLR, readxl, magrittr, dplyr, ggplot2, skimr, GGally, car, leaps) # add the packages needed
 ```
 
 
@@ -89,34 +89,188 @@ str(auto)
 summary(auto)
 sum(is.na(auto))
 
-#recoding as factors
+#recoding as factors, removing name
 auto <- auto %>% mutate(cylinders = as.factor(cylinders),
          origin = as.factor(origin),
          origin = recode_factor(origin, "1" = "American", 
                                 "2" = "European",
-                                "3" = "Japanese"))
+                                "3" = "Japanese")) %>%
+        select(-name)
 #skim data
 skim(auto)
 
 #look for correlations
 auto %>% select_if(is.numeric) %>%
   ggpairs()
+
+#visualize skewed var
+hist(auto$displacement)
+hist(auto$horsepower)
 ```
 
-Overall, the data is fairly clean with no missing values, as seen above. MPG has strong negative correlations with displacement, weight, horsepower; each of these independent variables also has a strong, positive correlation with the other two factors. All correlations modeled are significant at the level of p < 0.001.
+Overall, the data is fairly clean with no missing values, as seen above. *Displacement and horsepower both have right skew, but not severe enough to warrant log-transforming a predictor.* Cylinders was recoded as a factor based on the non-linear relationship observed in similar analyses of mpg conducted for Homework 2, Case Study 3.
+
+MPG has strong negative correlations with displacement, weight, horsepower; each of these independent variables also has a strong, positive correlation with the other two factors. All correlations modeled are significant at the level of p < 0.001, indicating that each variable is interrelated. 
 
 a) You may explore the possibility of variable transformations. We normally do not suggest to transform $x$ for the purpose of interpretation. You may consider to transform $y$ to either correct the violation of the linear model assumptions or if you feel a transformation of $y$ makes more sense from some theory. In this case we suggest you to look into `GPM=1/MPG`. *Compare residual plots of MPG or GPM as responses and see which one might yield a more satisfactory patterns*. In addition, can you provide some background knowledge to support the notion: it makes more sense to model `GPM`?  
 
+Logically, GPM may be better because ...
+
+To test this, we'll compare the residuals and Q-Q plots of MPG and GPM as fit by full models (i.e. including all possible predictors). Whichever better meets the assumptions needed of linear modeling (linearity, homoscedasticity, and normality) will be used as $y$ in building our model.
+
+``` {r gpm}
+#new gpm variable
+auto_gpm <- auto %>% mutate(gpm = 1/mpg) %>%
+  select(-mpg)
+
+#full models for MPG and GPM
+fit.mpg <- lm(mpg ~ ., auto)
+fit.gpm <- lm(gpm ~ ., auto_gpm)
+
+#plots
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+#plot residuals
+plot(fit.mpg, 1, pch=16, main = "MPG")
+abline(h=0, col="blue", lwd=2)
+
+#plot qq
+plot(fit.mpg, 2)
+
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+plot(fit.gpm, 1, pch=16, main = "GPM")
+abline(h=0, col="blue", lwd=2)
+plot(fit.gpm, 2)
+```
+
+*As seen above, neither GPM or MPG have very well distributed residuals, so we'll try log-transforming mpg and taking the square root of gpm. These look better but interpretability is questionable. Proceeding with GPM for now* 
+
+``` {r mpg_log}
+#log mpg
+auto.log <- auto %>% mutate(log_mpg = log(mpg)) %>%
+  select(-mpg)
+fit.log_mpg <- lm(log_mpg ~ ., auto.log)
+
+#plots
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+plot(fit.log_mpg, 1, pch=16)
+abline(h=0, col="blue", lwd=2)
+plot(fit.log_mpg, 2)
+
+#sqrt gpm
+auto.sqrt.gpm <- auto_gpm %>% mutate(sqrt.gpm = sqrt(gpm)) %>%
+  select(-gpm)
+fit.sqrt_gpm <- lm(sqrt.gpm ~ ., auto.sqrt.gpm)
+
+#plots
+par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
+plot(fit.sqrt_gpm, 1, pch=16)
+abline(h=0, col="blue", lwd=2)
+plot(fit.sqrt_gpm, 2)
+```
+
+
+``` {r gpm.corr}
+#look for correlations
+auto_gpm %>% select_if(is.numeric) %>%
+  ggpairs()
+```
+
+Based on the correlation plot outputs, the predictor variables look like they have a more linear relationship with gpm than they had with mpg, further supporting the decision to use gpm.
+
 b) You may also explore by adding interactions and higher order terms. The model(s) should be as *parsimonious* (simple) as possible, unless the gain in accuracy is significant from your point of view. 
 
+From the correlation plots, there do not appear to be any higher-order relationships with gpm. We will test several models though for interaction effects, namely with origin, year, and cylinders, since each could feasibly have an in interaction with the car's efficiency at a given horespower, weight, acceleration or displacement; year and cylinders since this could affect the mechanics used in the car to achieve a given performance and origin since cars manufactured in different locations could be made differently/adhere to different efficiency standards.
+
+```{r origin.interaction}
+Anova(lm(gpm ~ horsepower + origin + horsepower*origin, auto_gpm))
+Anova(lm(gpm ~ weight + origin + weight*origin, auto_gpm))
+Anova(lm(gpm ~ acceleration + origin + acceleration*origin, auto_gpm))
+Anova(lm(gpm ~ displacement + origin + displacement*origin, auto_gpm))
+```
+
+The above provides evidence that $origin*acceleration$ and $origin*weight$ may add value to the model.
+
+```{r year.interaction}
+summary(lm(gpm ~ horsepower + year + horsepower*year, auto_gpm))
+summary(lm(gpm ~ weight + year + weight*year, auto_gpm))
+summary(lm(gpm ~ acceleration + year + acceleration*year, auto_gpm))
+summary(lm(gpm ~ displacement + year + displacement*year, auto_gpm))
+```
+
+The above provides evidence that $year*acceleration$, $year*horsepower$, and $year*weight$ may add value to the model.
+
+```{r cylinders.interaction}
+Anova(lm(gpm ~ horsepower + cylinders + horsepower*cylinders, auto_gpm))
+Anova(lm(gpm ~ weight + cylinders + weight*cylinders, auto_gpm))
+Anova(lm(gpm ~ acceleration + cylinders + acceleration*cylinders, auto_gpm))
+Anova(lm(gpm ~ displacement + cylinders + displacement*cylinders, auto_gpm))
+```
+
+The above provides evidence that $cylinders*horsepower$ and $cylinders*acceleration$ may add value to the model.
+
+Exploring all interactions at once: *(but this should have a higher bar of significance since each beta must add value when controlling for other predictors - is this better? probably more straightforward?)*
+
+``` {r}
+Anova(lm(gpm ~ (.)^2, auto_gpm))
+```
+
 c) Use Mallow's $C_p$ or BIC to select the model.
+
+``` {r gpm.cp}
+#cp for all possible d's
+fit.gpm <- regsubsets(gpm ~., auto_gpm , nvmax=15, method="exhaustive")
+sum_fit.gpm <- summary(fit.gpm)
+sum_fit.gpm
+
+#plot
+plot(sum_fit.gpm$cp, xlab="Number of predictors", 
+     ylab="Cp", col="red", pch=16)
+
+#plot BIC for fun
+plot(sum_fit.gpm$bic, xlab="Number of predictors", 
+     ylab="BIC", col="red", type="p", pch=16)
+```
+Based on the elbow rule looking both at CP and BIC, d=3 is sufficient to model gpm. Going to compare d=3 and d=4 solutions to see how adding cylinders (categorical) changes the fit (e.g. is adding all levels of cylinder analogous to adding 1 or 5 predictors?)
+
+``` {r}
+fit.exh.var <- sum_fit.gpm$which #indicators if variable is included
+#pull vars for model.a, d=3
+predictors <- colnames(fit.exh.var)[fit.exh.var[3,]] 
+predictors[-c(1)] #drop intercept
+
+#pull vars for model.b, d=4
+colnames(fit.exh.var)[fit.exh.var[5,]]
+
+#create models
+model.a <- lm(gpm ~ horsepower + weight + year, auto_gpm)
+model.b <- lm(gpm ~ horsepower + weight + year + cylinders, auto_gpm)
+
+#compare and check for significance
+anova(model.a, model.b)
+
+Anova(model.a)
+Anova(model.b)
+
+summary(model.a)
+summary(model.b)
+```
+
+*interaction effects?*
 
 2) Describe the final model and its accuracy. Include diagnostic plots with particular focus on the model residuals.
 
   * Summarize the effects found.
   * Predict the `mpg` of a car that is: built in 1983, in the US, red, 180 inches long, 8 cylinders, 350 displacement, 260 as horsepower, and weighs 4,000 pounds. Give a 95% CI.
   * Any suggestions as to how to improve the quality of the study?
+  We may evaluate the model’s accuracy through prediction error in which case the data must be splitted into train and test dataset. In another way, we may use Mallow Cp or BIC criterion.
 
+
+Modelling the residuals of final model
+
+```{r auto.diagnostic}
+
+
+```
 
 # Case study 2: COVID
 
