@@ -541,7 +541,6 @@ county_data_lasso <-  county_data_sub %>%
 fit.1se.lm <- lm(log_total_death_per100k~., data = county_data_lasso) 
 summary(fit.1se.lm) 
 
-
 ### TO DO: use Cp or BIC to fine-tune the LASSO model.
 county_data_lasso <- data.frame(county_data_lasso) # convert from data.table to data.frame
 county_data_lasso_sub <- county_data_lasso[ ,c("log_total_death_per100k", var.1se)] # extract response & LASSO output vars
@@ -562,6 +561,29 @@ Anova(final_covid_fit)
 v) If necessary, reduce the model from iv) to a final model with all variables being significant at 0.05 level. Are the linear model assumptions all reasonably met?
 ```{r}
 plot(final_covid_fit)
+```
+
+# remove zeros
+```{r}
+county_data_lasso_fix <- county_data_lasso%>%
+  subset(log_total_death_per100k != 0)
+  
+final_covid_fit_nozero <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables, 'State')]))
+summary(final_covid_fit_nozero)
+Anova(final_covid_fit_nozero)
+plot(final_covid_fit_nozero)
+
+```
+
+reduced model
+```{r}
+final_covid_fit_reduced <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables[-2], 'State')]))
+anova(final_covid_fit_reduced, final_covid_fit_nozero)
+```
+
+model assumptions
+```{r}
+plot(final_covid_fit_reduced)
 ```
 
 vi) It has been shown that COVID affects elderly the most. It is also claimed that the COVID death rate among African Americans and Latinos is higher. Does your analysis support these arguments?
