@@ -601,6 +601,11 @@ vii) Based on your final model, summarize your findings. In particular, summariz
 
 viii) What else can we do to improve our model? What other important information we may have missed? 
 
+Hospital Load metrics
+Political Party Information
+Holidays & Gatherings
+
+
 ix) (Optional) Would your findings be very different if you had refined the data in some way or imputed the missing values in part ii). Check PCA lecture, section 10 for imputations via `softImpute`. 
 
 
