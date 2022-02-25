@@ -230,32 +230,36 @@ plot(sum_fit.gpm$cp, xlab="Number of predictors",
 plot(sum_fit.gpm$bic, xlab="Number of predictors", 
      ylab="BIC", col="red", type="p", pch=16)
 ```
-Based on the elbow rule looking both at CP and BIC, d=3 is sufficient to model gpm. Going to compare d=3 and d=4 solutions to see how adding cylinders (categorical) changes the fit (e.g. is adding all levels of cylinder analogous to adding 1 or 5 predictors?)
+Based on the elbow rule looking both at CP and BIC, d=3 is sufficient to model gpm; this also avoids the difficulties of forcing the model to include all 5 levels of the categorical cylinders predictor.
+
+Looking for interaction effects, specifically starting with two possible identified by Anova in Part B. 
 
 ``` {r}
-fit.exh.var <- sum_fit.gpm$which #indicators if variable is included
-#pull vars for model.a, d=3
-predictors <- colnames(fit.exh.var)[fit.exh.var[3,]] 
-predictors[-c(1)] #drop intercept
+fit.gpm_int <- regsubsets(gpm ~ . + acceleration*year + horsepower*acceleration, auto_gpm , nvmax=15, method="exhaustive")
+sum_fit.gpm_int <- summary(fit.gpm_int)
+sum_fit.gpm_int
 
-#pull vars for model.b, d=4
-colnames(fit.exh.var)[fit.exh.var[5,]]
+#plot
+plot(sum_fit.gpm_int$cp, xlab="Number of predictors", 
+     ylab="Cp", col="red", pch=16)
 
-#create models
-model.a <- lm(gpm ~ horsepower + weight + year, auto_gpm)
-model.b <- lm(gpm ~ horsepower + weight + year + cylinders, auto_gpm)
-
-#compare and check for significance
-anova(model.a, model.b)
-
-Anova(model.a)
-Anova(model.b)
-
-summary(model.a)
-summary(model.b)
+#plot BIC for fun
+plot(sum_fit.gpm_int$bic, xlab="Number of predictors", 
+     ylab="BIC", col="red", type="p", pch=16)
 ```
 
-*interaction effects?*
+Based on the elbow rule, both the d=4 or d=5 models would be good choices for predicting gpm.
+
+``` {r}
+fit.exh.var_int <- sum_fit.gpm_int$which #indicators if variable is included
+#pull vars for interaction model d=4
+predictors_int4 <- colnames(fit.exh.var_int)[fit.exh.var_int[4,]] 
+
+#pull vars for interaction model d=5
+predictors_int5 <- colnames(fit.exh.var_int)[fit.exh.var_int[5,]] 
+```
+
+However, both the model with 4 predictors (`r predictors_int4[-c(1)]`) and the model with 5 predictors (`rpredictors_int5[-c(1)]`) include interaction terms but not main effects for those variables (i.e. acceleration:year but not main effects of year). Additionally, the d=5 model includes only one level of a categorical variable (cylinder). Rectifying both would require forcing variables into the model, reducing the degrees of freedom and ultimately changing the criteria upon which that model was selected in the first place, $C_p$. 
 
 2) Describe the final model and its accuracy. Include diagnostic plots with particular focus on the model residuals.
 
@@ -268,8 +272,17 @@ summary(model.b)
 Modelling the residuals of final model
 
 ```{r auto.diagnostic}
+fit.exh.var <- sum_fit.gpm$which #indicators if variable is included
+#pull vars for gpm.final, d=3
+predictors <- colnames(fit.exh.var)[fit.exh.var[3,]] 
+predictors[-c(1)] #drop intercept
 
+#create model
+gpm.final <- lm(gpm ~ horsepower + weight + year, auto_gpm)
 
+#diagnostics
+Anova(gpm.final)
+summary(gpm.final)
 ```
 
 # Case study 2: COVID
