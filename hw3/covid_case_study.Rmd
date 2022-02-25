@@ -563,10 +563,18 @@ v) If necessary, reduce the model from iv) to a final model with all variables b
 plot(final_covid_fit)
 ```
 
+outliers indentify
+```{r}
+county_data_lasso$Residuals<-final_covid_fit$resid
+county_data_lasso_fix <- county_data_lasso%>%
+  subset(abs(Residuals) < 2*sigma(final_covid_fit))
+
+```
+
 # remove zeros
 ```{r}
-county_data_lasso_fix <- county_data_lasso%>%
-  subset(log_total_death_per100k != 0)
+#county_data_lasso_fix <- county_data_lasso%>%
+#  subset(log_total_death_per100k != 0)
   
 final_covid_fit_nozero <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables, 'State')]))
 summary(final_covid_fit_nozero)
@@ -577,13 +585,14 @@ plot(final_covid_fit_nozero)
 
 reduced model
 ```{r}
-final_covid_fit_reduced <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables[-2], 'State')]))
-anova(final_covid_fit_reduced, final_covid_fit_nozero)
+#final_covid_fit_reduced <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables[-2], 'State')]))
+#anova(final_covid_fit_reduced, final_covid_fit_nozero)
 ```
 
 model assumptions
 ```{r}
-plot(final_covid_fit_reduced)
+#plot(final_covid_fit_reduced)
+plot(final_covid_fit_nozero)
 ```
 
 vi) It has been shown that COVID affects elderly the most. It is also claimed that the COVID death rate among African Americans and Latinos is higher. Does your analysis support these arguments?
