@@ -490,6 +490,8 @@ State should be forced into the model because this is a critical variable of int
 county_data_sub <- county_data_sub %>%
   select(-County, -FIPS)
 
+county_data_sub$Type_2015_Update <- as.factor(county_data_sub$Type_2015_Update) # set this variable to be a factor
+
 # remove all rows containing NAs (LASSO does not work without this step)
 county_data_sub <- na.omit(county_data_sub)
 
@@ -528,6 +530,8 @@ coef.1se
 
 iv) Use `Cp` or BIC to fine tune the LASSO model from iii). Again **force in State** in the process. 
 
+Running regsubsets with State forced in causes a crash on the computers of all group members. To still be able to account for State effects, we ran regsubsets without State, and included it in our final model as a workaroud "forcing" of State. 
+
 ```{r}
 # let's first see what the linear model looks like based on variables selected by LASSO
 coef.1se <- coef(lasso_cv, s="lambda.1se")  #s=c("lambda.1se","lambda.min") or lambda value
@@ -563,6 +567,8 @@ v) If necessary, reduce the model from iv) to a final model with all variables b
 plot(final_covid_fit)
 ```
 
+The asusmptions of the model are not met. This is likely due to the influence of outliers. We will identify and remove outliers from our model to achieve a better fit. We define outliers as having a residual more than two sigma away from the mean. 
+
 outliers indentify
 ```{r}
 county_data_lasso$Residuals<-final_covid_fit$resid
@@ -571,7 +577,7 @@ county_data_lasso_fix <- county_data_lasso%>%
 
 ```
 
-# remove zeros
+# remove outliers
 ```{r}
 #county_data_lasso_fix <- county_data_lasso%>%
 #  subset(log_total_death_per100k != 0)
@@ -595,16 +601,23 @@ model assumptions
 plot(final_covid_fit_nozero)
 ```
 
+Now that we have removed outliers, model assumptions are reasonably met. 
+
 vi) It has been shown that COVID affects elderly the most. It is also claimed that the COVID death rate among African Americans and Latinos is higher. Does your analysis support these arguments?
+
+Our model does not explicitly/directly suggest that the death rate is higher in African Americans and Latinos. Instead, we can see that being white non-histpanic is associated with a slightly lower mortality rate. This suggests that all minority groups fare worse in terms of mortality. 
 
 vii) Based on your final model, summarize your findings. In particular, summarize the state effect controlling for others. Provide intervention recommendations to policy makers to reduce COVID death rate.
 
+The state effect appears to be quite important, with several states being associated with higher mortality (e.g. South Dakota), and several being associated with lower mortality (e.g. Vermont). It is our recommendation that interventions should be handled on a state-by-state basis, and federally determined policies may not be beneficial across the board. Additionally, it appears that age is a major factor, with higher numbers of children and people over the age of 65 both being associated with a higher mortality. The effect of children is likely due to the fact that vaccine approval for children required more time, as well as schooling and play serving as possible transmission vectors. Of course, since individuals over the age of 65 are at higher risk of death from COVID due to immune function decay, it is not surprising that higher amounts of these individuals are associated with higher mortality. Policy interventions may focus on protecting individuals over the age of 65 (via healthcare subsidies and facility availability), and making vaccines more available among children now that approval has been cleared. Higher education is associated with reduced mortality, indicating a possible intervention route as increasing higher education in some capacity, possibly via subsidies and incentives programs. The percent of people employed in construction and agriculture are both associated with lower mortality, which may be surprising at first, but both of these trades routinely require the use of face masks despite elevated levels of person-to-person contact, which may explain some of the effect. This may imply that face masks are indeed effective at reducing transmission. The economic type of a county also seems to affect mortality, though thi smay be captured by the percent in construction and agriculture. Percent of white non-hispanic and net migration rate between 2010-2019 are associated with reduced mortality, indicating that all minority groups or immigrant populations may be at higher risk, and interventions should be crafted around improving the conditions of minority or foreign groups. 
+
 viii) What else can we do to improve our model? What other important information we may have missed? 
 
-Hospital Load metrics
-Political Party Information
-Holidays & Gatherings
+The following information may be helpful in improving out model:
 
+1. Hospital Load & Healthcare Infrastructure Data (i.e. capacity of hospitals and care facilities per county/state)
+2. Political Party Information (percent of voters registered in each party)
+3. Holidays & Gatherings (travel information for individuals)
 
 ix) (Optional) Would your findings be very different if you had refined the data in some way or imputed the missing values in part ii). Check PCA lecture, section 10 for imputations via `softImpute`. 
 
