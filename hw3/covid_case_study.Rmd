@@ -7,7 +7,7 @@ author:
 date: 'Due before midnight, Feb 27'
 output:
   html_document:
-    code_folding: hide
+    code_folding: show
     highlight: haddock
     theme: lumen
     toc: yes
@@ -20,8 +20,8 @@ output:
 urlcolor: blue
 ---
 
-```{r Setup, include=FALSE, results='hide', warning=FALSE}
-knitr::opts_chunk$set(echo = T, fig.width=8, fig.height=4)
+```{r Setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 
 # Package setup
@@ -29,7 +29,7 @@ if(!require("pacman")) install.packages("pacman")
 
 pacman::p_load(tidyverse, dplyr, ggplot2, ggthemes, data.table, lubridate,
                GGally, RColorBrewer, ggsci, plotROC, usmap,
-               plotly, ggpubr, vistime, skimr, tidyr, glmnet, dgCMatrix, leaps, car)
+               plotly, ggpubr, vistime, skimr, glmnet, dgCMatrix, leaps, car)
 ```
 
 # Background
@@ -99,15 +99,15 @@ The detailed description of variables is in `Appendix 1: Data description`. Plea
 
 ```{r}
 # explore county data
-head(county_data)
-dim(county_data)
+# head(county_data)
+# dim(county_data)
 # str(county_data)
 # summary(county_data)
 skim(county_data)
 
 # explore covid_rate
-head(covid_rate)
-dim(covid_rate)
+# head(covid_rate)
+# dim(covid_rate)
 # str(covid_rate)
 # summary(covid_rate)
 skim(covid_rate)
@@ -143,14 +143,6 @@ i) Plot **new** COVID cases in NY, WA and FL by state and by day. Any irregular 
 First, we start by creating a `county_new_cases` variable, defined as the row-wise difference of the existing cumulative variable `cum_cases`. Next, we create a `state_new_cases` variable, which is the sum of all new cases per day, across all counties of a given state. 
 
 ```{r}
-
-# some cum_cases are acutally decreasing, which is not possible for a cumulative variable. When a given cum_case value is smaller than the previous cum_case value, we replace that cum_case value by the previous value: 
-# covid_rate <- covid_rate %>%
-  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) # %>%
-  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) %>%
-  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases)) %>%
-  # mutate(cum_cases = ifelse(cum_cases < lag(cum_cases), lag(cum_cases), cum_cases))
-# ended up not doing this as there are many decreasing values in a row, which means I'd have to replace by a previous value repeatedly for all those rows.
 
 # create county_new_cases variable
 covid_rate <- covid_rate %>%
@@ -227,27 +219,6 @@ MS <- covid_rate %>%
 ggpubr::ggarrange(PA, MS, nrow = 2)
 
 
-# plot the county_new_cases for a few counties to illustrate negative values (this should technically not be possible)
-# PA <- covid_rate %>%
-#   filter(State %in% c("Pennsylvania"),
-#          County %in% c("Lancaster", "Allegheny", "Philadelphia")) %>%
-#   ggplot(aes(x = date, y = county_new_cases, color = County)) + 
-#     geom_point() + 
-#     facet_grid(~County) + 
-#     theme_bw() +
-#     ggtitle("New daily COVID cases in 3 counties of Pennsylvania")
-# 
-# MS <- covid_rate %>%
-#   filter(State %in% c("Massachusetts"),
-#          County %in% c("Suffolk", "Barnstable", "Middlesex")) %>%
-#   ggplot(aes(x = date, y = county_new_cases, color = County)) + 
-#     geom_point() + 
-#     facet_grid(~County) + 
-#     theme_bw() +
-#     ggtitle("New daily COVID cases in 3 counties of Massachusetts")
-# 
-# ggpubr::ggarrange(PA, MS, nrow = 2)
-
 ```
 
 
@@ -257,7 +228,7 @@ ii) Create **weekly new** cases per 100k `weekly_case_per100k`. Plot the spaghet
 
 We want to know the number of new cases per week and per 100k in each state. To do this, we sum the new cases up per state and week, divide it by the total population and then by 100'000. 
 
-```{r fig.width=8}
+```{r fig.width=8, fig.height=9}
 
 # create total state population variable
 total_pop <- covid_rate %>%
@@ -286,6 +257,10 @@ weekly_state %>%
     theme_bw() +
     ggtitle("Weekly new cases per 100k in all States") +
     theme(legend.position="bottom")
+
+```
+
+```{r, fig.width=8, fig.height=6}
 
 # spaghetti plot of weekly_case_per100k for NY, FL, WA
 weekly_state %>%
@@ -317,7 +292,7 @@ iv) (Optional) Use `covid_intervention` to see whether the effectiveness of lock
 
 i) For each month in 2020, plot the monthly deaths per 100k heatmap by state on US map. Use the same color range across months. (Hints: Set `limits` argument in `scale_fill_gradient()` or use `facet_wrap()`; use `lubridate::month()` and `lubridate::year()` to extract month and year from date; use `tidyr::complete(state, month, fill = list(new_case_per100k = NA))` to complete the missing months with no cases.)
 
-```{r, fig.width=15}
+```{r, fig.width=8}
 # I'll first create a month and year variable for each row. This will help us pick out what we need.
 covid_rate <- covid_rate %>%
   mutate(YEAR = lubridate::year(date)) %>%
@@ -367,8 +342,6 @@ covid_map <- plot_usmap(data = covid_deaths_2020, values = "state_deaths_per_100
   labs(title = "COVID-19 Deaths per 100k Month-by-Month") + 
   theme(legend.position = "right") + facet_wrap(vars(MONTH))
 covid_map
-
-# ggplotly(covid_map, text = paste("Cases:", NAME_1))
   
 ```
 
@@ -490,7 +463,7 @@ State should be forced into the model because this is a critical variable of int
 county_data_sub <- county_data_sub %>%
   select(-County, -FIPS)
 
-county_data_sub$Type_2015_Update <- as.factor(county_data_sub$Type_2015_Update) # set this variable to be a factor
+# county_data_sub$Type_2015_Update <- as.factor(county_data_sub$Type_2015_Update) # set this variable to be a factor
 
 # remove all rows containing NAs (LASSO does not work without this step)
 county_data_sub <- na.omit(county_data_sub)
