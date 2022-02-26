@@ -564,52 +564,59 @@ Anova(final_covid_fit)
 
 v) If necessary, reduce the model from iv) to a final model with all variables being significant at 0.05 level. Are the linear model assumptions all reasonably met?
 ```{r}
-plot(final_covid_fit)
+
+# generating diagnostic plots
+par(mfrow = c(1,2), mar = c(5,2,4,2), mgp = c(3,0.5,0)) # plot(fit3) produces several plots
+plot(final_covid_fit, 1, pch = 16) # residual plot
+abline(h = 0, col = "blue", lwd = 2)
+plot(final_covid_fit, 2) # qqplot
 ```
 
-The asusmptions of the model are not met. This is likely due to the influence of outliers. We will identify and remove outliers from our model to achieve a better fit. We define outliers as having a residual more than two sigma away from the mean. 
+The assumptions of the model are not met. This is likely due to the influence of outliers. We will identify and remove outliers from our model to achieve a better fit. We define outliers as having a residual more than two sigma away from the mean. 
 
-outliers indentify
+
 ```{r}
-county_data_lasso$Residuals<-final_covid_fit$resid
+# identify & remove outliers
+county_data_lasso$Residuals <- final_covid_fit$resid
 county_data_lasso_fix <- county_data_lasso%>%
   subset(abs(Residuals) < 2*sigma(final_covid_fit))
 
 ```
 
-# remove outliers
+
 ```{r}
 #county_data_lasso_fix <- county_data_lasso%>%
 #  subset(log_total_death_per100k != 0)
-  
+
+# run model without outliers
 final_covid_fit_nozero <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables, 'State')]))
 summary(final_covid_fit_nozero)
 Anova(final_covid_fit_nozero)
-plot(final_covid_fit_nozero)
 
+# generating diagnostic plots
+par(mfrow = c(1,2), mar = c(5,2,4,2), mgp = c(3,0.5,0)) # plot(fit3) produces several plots
+plot(final_covid_fit_nozero, 1, pch = 16) # residual plot
+abline(h = 0, col = "blue", lwd = 2)
+plot(final_covid_fit_nozero, 2) # qqplot
 ```
 
-reduced model
-```{r}
+
+```{r, include=FALSE, eval=FALSE}
+# reduced model
 #final_covid_fit_reduced <- lm(log_total_death_per100k ~., data = data.frame(county_data_lasso_fix[, c("log_total_death_per100k", final_variables[-2], 'State')]))
 #anova(final_covid_fit_reduced, final_covid_fit_nozero)
 ```
 
-model assumptions
-```{r}
-#plot(final_covid_fit_reduced)
-plot(final_covid_fit_nozero)
-```
 
 Now that we have removed outliers, model assumptions are reasonably met. 
 
 vi) It has been shown that COVID affects elderly the most. It is also claimed that the COVID death rate among African Americans and Latinos is higher. Does your analysis support these arguments?
 
-Our model does not explicitly/directly suggest that the death rate is higher in African Americans and Latinos. Instead, we can see that being white non-histpanic is associated with a slightly lower mortality rate. This suggests that all minority groups fare worse in terms of mortality. 
+Our model confirms that COVID death rates are increased in the elderly, indicating that this portion of the population is more vulnerable to the virus. However, our model does not explicitly/directly suggest that the death rate is higher in African Americans and Latinos. Instead, we can see that being white non-hispanic is associated with a slightly lower mortality rate. This suggests that comparatively, other minority groups fare worse in terms of mortality. 
 
 vii) Based on your final model, summarize your findings. In particular, summarize the state effect controlling for others. Provide intervention recommendations to policy makers to reduce COVID death rate.
 
-The state effect appears to be quite important, with several states being associated with higher mortality (e.g. South Dakota), and several being associated with lower mortality (e.g. Vermont). It is our recommendation that interventions should be handled on a state-by-state basis, and federally determined policies may not be beneficial across the board. Additionally, it appears that age is a major factor, with higher numbers of children and people over the age of 65 both being associated with a higher mortality. The effect of children is likely due to the fact that vaccine approval for children required more time, as well as schooling and play serving as possible transmission vectors. Of course, since individuals over the age of 65 are at higher risk of death from COVID due to immune function decay, it is not surprising that higher amounts of these individuals are associated with higher mortality. Policy interventions may focus on protecting individuals over the age of 65 (via healthcare subsidies and facility availability), and making vaccines more available among children now that approval has been cleared. Higher education is associated with reduced mortality, indicating a possible intervention route as increasing higher education in some capacity, possibly via subsidies and incentives programs. The percent of people employed in construction and agriculture are both associated with lower mortality, which may be surprising at first, but both of these trades routinely require the use of face masks despite elevated levels of person-to-person contact, which may explain some of the effect. This may imply that face masks are indeed effective at reducing transmission. The economic type of a county also seems to affect mortality, though thi smay be captured by the percent in construction and agriculture. Percent of white non-hispanic and net migration rate between 2010-2019 are associated with reduced mortality, indicating that all minority groups or immigrant populations may be at higher risk, and interventions should be crafted around improving the conditions of minority or foreign groups. 
+The state effect appears to be quite important, with several states being associated with higher mortality (e.g. South Dakota), and several being associated with lower mortality (e.g. Vermont). It is our recommendation that interventions should be handled on a state-by-state basis, and federally determined policies may not be beneficial across the board. Additionally, it appears that age is a major factor, with higher numbers of children and people over the age of 65 both being associated with a higher mortality. The effect of children is likely due to the fact that vaccine approval for children required more time, as well as schooling and play serving as possible transmission vectors. Of course, since individuals over the age of 65 are at higher risk of death from COVID due to immune function decay, it is not surprising that higher amounts of these individuals are associated with higher mortality. Policy interventions may focus on protecting individuals over the age of 65 (via healthcare subsidies and facility availability), and making vaccines more available among children now that approval has been cleared. Higher education is associated with reduced mortality, indicating a possible intervention route as increasing higher education in some capacity, possibly via subsidies and incentives programs. The percent of people employed in construction and agriculture are both associated with lower mortality, which may be surprising at first, but both of these trades involve being mostly outdoors and routinely require the use of face masks despite sometimes elevated levels of person-to-person contact, which may explain some of the effect. This may imply that an outdoor setting and/or wearing face masks are indeed effective at reducing transmission. The economic type of a county also seems to affect mortality, though this may be captured by the percent in construction and agriculture. Percent of white non-hispanic and net migration rate between 2010-2019 are associated with reduced mortality, indicating that all minority groups or immigrant populations may be at higher risk, and interventions should be crafted around improving the conditions of minority or foreign groups. 
 
 viii) What else can we do to improve our model? What other important information we may have missed? 
 
@@ -618,6 +625,7 @@ The following information may be helpful in improving out model:
 1. Hospital Load & Healthcare Infrastructure Data (i.e. capacity of hospitals and care facilities per county/state)
 2. Political Party Information (percent of voters registered in each party)
 3. Holidays & Gatherings (travel information for individuals)
+4. Percent vaccination by population category (e.g. age groups)
 
 ix) (Optional) Would your findings be very different if you had refined the data in some way or imputed the missing values in part ii). Check PCA lecture, section 10 for imputations via `softImpute`. 
 
