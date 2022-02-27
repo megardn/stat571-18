@@ -6,10 +6,6 @@ author:
 - Joelle Bagautdinova
 date: 'Due: 11:59Pm,  2/27, 2022'
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: hide
     highlight: haddock
@@ -18,6 +14,10 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -114,9 +114,7 @@ MPG has strong negative correlations with displacement, weight, horsepower; each
 
 a) You may explore the possibility of variable transformations. We normally do not suggest to transform $x$ for the purpose of interpretation. You may consider to transform $y$ to either correct the violation of the linear model assumptions or if you feel a transformation of $y$ makes more sense from some theory. In this case we suggest you to look into `GPM=1/MPG`. Compare residual plots of MPG or GPM as responses and see which one might yield a more satisfactory patterns. In addition, can you provide some background knowledge to support the notion: it makes more sense to model `GPM`?  
 
-Logically, GPM may be better because it more directly reflects fuel consumption. Additionally, when calculating fuel use over a fixed distance,
-
-To test this, we'll compare the residuals and Q-Q plots of MPG and GPM as fit by full models (i.e. including all possible predictors). Whichever better meets the assumptions needed of linear modeling (linearity, homoscedasticity, and normality) will be used as $y$ in building our model.
+Logically, GPM may be better because it more directly reflects fuel consumption. Additionally, mpg is difficult to compare between cars as a 1 mpg increase in a low-efficiency car (eg 12 to 13 mpg would be $\frac{1}{13} GPM - \frac{1}{12}GPM = -0.00641 GPM$) is not equivalent to a 1 mpg increase in a high efficiency car (eg 25 to 26 mpg would be $\frac{1}{26} GPM - \frac{1}{25}GPM = -0.00154 GPM$). To test this, we'll compare the residuals and Q-Q plots of MPG and GPM as fit by full models (i.e. including all possible predictors). Whichever better meets the assumptions needed of linear modeling (linearity, homoscedasticity, and normality) will be used as $y$ in building our model.
 
 ``` {r gpm}
 #new gpm variable
@@ -127,19 +125,19 @@ auto_gpm <- auto %>% mutate(gpm = 1/mpg) %>%
 fit.mpg <- lm(mpg ~ ., auto)
 fit.gpm <- lm(gpm ~ ., auto_gpm)
 
-#plots
+#plots mpg
 par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
 #plot residuals
 plot(fit.mpg, 1, pch=16, main = "MPG")
 abline(h=0, col="blue", lwd=2)
-
 #plot qq
-plot(fit.mpg, 2)
+plot(fit.mpg, 2, main="MPG")
 
+#plot gpm
 par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
 plot(fit.gpm, 1, pch=16, main = "GPM")
 abline(h=0, col="blue", lwd=2)
-plot(fit.gpm, 2)
+plot(fit.gpm, 2, main="GPM")
 ```
 
 As seen above, neither GPM or MPG have very well distributed residuals, so we'll try log-transforming mpg and taking the square root of gpm: 
@@ -152,9 +150,9 @@ fit.log_mpg <- lm(log_mpg ~ ., auto.log)
 
 #plots
 par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
-plot(fit.log_mpg, 1, pch=16)
+plot(fit.log_mpg, 1, pch=16, main = "log MPG")
 abline(h=0, col="blue", lwd=2)
-plot(fit.log_mpg, 2)
+plot(fit.log_mpg, 2, main = "log MPG")
 
 #sqrt gpm
 auto.sqrt.gpm <- auto_gpm %>% mutate(sqrt.gpm = sqrt(gpm)) %>%
@@ -163,10 +161,11 @@ fit.sqrt_gpm <- lm(sqrt.gpm ~ ., auto.sqrt.gpm)
 
 #plots
 par(mfrow=c(1,2), mar=c(5,2,4,2), mgp=c(3,0.5,0)) #set formatting
-plot(fit.sqrt_gpm, 1, pch=16)
+plot(fit.sqrt_gpm, 1, pch=16, main="Square Root GPM")
 abline(h=0, col="blue", lwd=2)
-plot(fit.sqrt_gpm, 2)
+plot(fit.sqrt_gpm, 2, main="Square Root GPM")
 ```
+
 While these transformed values look better in terms of residuals, interpretability is questionable. Therefore we'll proceed with GPM as our outcome variable, as it's homoscestasticity, linearity and normality are acceptable. 
 
 ``` {r gpm.corr}
@@ -180,6 +179,7 @@ Based on the correlation plot outputs, the predictor variables look like they ha
 b) You may also explore by adding interactions and higher order terms. The model(s) should be as *parsimonious* (simple) as possible, unless the gain in accuracy is significant from your point of view. 
 
 From the correlation plots, there do not appear to be any higher-order relationships with gpm. However, based on similar analyses run in homework 2 Case Study 3, we'll try modelling displacement, weight and horsepower as quadratics.
+
 ``` {r gpm.nonlinear}
 # plotting displacement and GPM with both a linear and a quadratic fit
 p.d <- ggplot(auto_gpm, aes(x = displacement, y = gpm)) + 
@@ -240,7 +240,7 @@ Anova(lm(gpm ~ displacement + cylinders + displacement*cylinders, auto_gpm))
 
 The above provides evidence that $cylinders*horsepower$ and $cylinders*acceleration$ may add value to the model.
 
-Data-Driven Interaciton Testing:
+Data-Driven Interaction Testing:
 Next we'll explore all possible interactions at once. This technique will have a higher bar of significance since each beta must add value when controlling for other predictors. Because of this and it's data-driven nature, this will likely result more accurate and parsimonious predictors.
 
 ``` {r}
@@ -330,7 +330,7 @@ summary(fit.main)
 summary(fit.int2)
 ```
 
-As seen above, both models have nearly identical explanatory power ($\sigma$ and Adjusted $R^2$); therefore we will chose the more parsimonious model without interaction effects for ease of interpretation. However, it is interesting to consider how acceleration grows (cars take longer to accelerate from 0 to 60 mph) the effect of horsepower on gpm increases; *why would this be happening?*
+As seen above, both models have nearly identical explanatory power ($\sigma$ and Adjusted $R^2$); therefore we will chose the more parsimonious model without interaction effects for ease of interpretation. However, it is interesting to consider how as acceleration grows (cars take longer to accelerate from 0 to 60 mph) the inverse effect of horsepower on gpm decreases; possibly cars that take a long time to accelerate may be less efficient despite having a high horsepower (due to weight or other factors not considered here) and therefore will burn more fuel (higher gpm).
 
 2) Describe the final model and its accuracy (Cp or BIC criterion). Include diagnostic plots with particular focus on the model residuals.
 
@@ -380,7 +380,7 @@ This new car will have a predicted fuel efficiency of `r mpg_predict[1]` mpg, wi
 
 * Any suggestions as to how to improve the quality of the study?
 
-
+This study could be improved by expanding the sample or assessing other factors that can affect fuel efficiency, such as type of transmission, mechanical resistance or aerodynamics.
 
 # Case study 2: COVID
 
