@@ -7,7 +7,7 @@ author:
 date: 'Due: 11:59Pm,  2/27, 2022'
 output:
   html_document:
-    code_folding: hide
+    code_folding: show
     highlight: haddock
     number_sections: yes
     theme: lumen
@@ -26,7 +26,7 @@ urlcolor: blue
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, fig.width=8, fig.height=4)
+knitr::opts_chunk$set(echo = TRUE, fig.width=8, fig.height=4)
 options(scipen = 0, digits = 3)  # controls base R output
 # check if you have ISLR package, if not, install it
 if(!require('pacman')) {install.packages('pacman')}

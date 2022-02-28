@@ -517,7 +517,7 @@ county_data_lasso <-  county_data_sub %>%
 fit.1se.lm <- lm(log_total_death_per100k~., data = county_data_lasso) 
 summary(fit.1se.lm) 
 
-### TO DO: use Cp or BIC to fine-tune the LASSO model.
+### Using Cp and BIC to fine-tune the LASSO model.
 county_data_lasso <- data.frame(county_data_lasso) # convert from data.table to data.frame
 county_data_lasso_sub <- county_data_lasso[ ,c("log_total_death_per100k", var.1se)] # extract response & LASSO output vars
 county_data_lasso_fine_tune <- regsubsets(log_total_death_per100k ~., nvmax = 17, method = "exhau", county_data_lasso_sub) # get Cp and BIC
