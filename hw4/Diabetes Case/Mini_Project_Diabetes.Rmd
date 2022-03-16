@@ -1,7 +1,10 @@
 ---
-title: "Predicting readmission probability for diabetes inpatients"
-author: "Modern Data Mining"
-date: ' '
+title: "Predicting readmission probability for diabetes inpatients,  HW4 GROUP 18"
+author:
+- Diego G. Davila
+- Margaret Gardner
+- Joelle Bagautdinova
+date: 'Due before midnight, March 20'
 output:
   pdf_document:
     toc: yes
