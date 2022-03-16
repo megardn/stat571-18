@@ -25,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr)   #add your packages here
 ```
 
 
@@ -78,7 +78,7 @@ The dataset used covers ~50 different variables to describe every hospital diabe
 **1) Patient identifiers:** 
 
 a. `encounter_id`: unique identifier for each admission 
-b. `patient_nbr`: unique identifier for each patient 
+b. `patient_nbr`: unique identifier for each patient *Note: potentially non-independent observations, maybe should restrict to one admission per patient?*
 
 **2) Patient Demographics:** 
 
@@ -122,7 +122,7 @@ Indicates whether a patient was readmitted after a particular admission. There a
 
 To save your time we are going to use some data sets cleaned by the group. Thus, we provide two datasets:
 
-**`diabetic.data.csv`** is the original data. You may use it for the purpose of summary if you wish. You will see that the original data can’t be used directly for your analysis, yet. 
+**`diabetic.data.csv`** is the original data. You may use it for the purpose of summary if you wish. You will see that the original data can’t be used directly for your analysis, yet. *Note: we should probably just skip ahead to using readmission.csv instead of trying to fuss with both?*
 
 **`readmission.csv`** is a cleaned version and they are modified in the following ways:
 
@@ -133,6 +133,46 @@ To save your time we are going to use some data sets cleaned by the group. Thus,
 3) Some categorical variables have been regrouped. For example, `Diag1_mod` keeps some original levels with large number of patients and aggregates other patients as `others`. This process is known as 'binning.'
 		
 4) The event of interest is **readmitted within < 30 days**. Note that you need to create this response first by regrouping **Readmission indicator**!
+
+## EDA
+
+Read `readmission.csv` as `readmit_data`
+```{r}
+readmit_data <- read.csv("readmission.csv", header=T, na.strings= c("?", "None"), stringsAsFactors = T)
+
+#recode encounter_id and patient_nbr as factor
+readmit_data <- readmit_data %>% mutate(encounter_id = as.factor(encounter_id),
+                                        patient_nbr = as.factor(patient_nbr),
+                                        readmit_30 = as.factor(ifelse(readmitted == '<30', 1, 0))) #code new response var readmission indicator - tbh not sure if this should be factor
+
+# str(readmit_data) 
+# summary(readmit_data)
+skim(readmit_data)
+```
+
+*Note: should probably drop A1C and max_glu since there are so many missing values*
+
+Remove duplicate patient IDs such that we only have the last inpatient admission for each subject. *Note: Seems to make sense to take the latest hospitalization, since it's most "up-to-date" but we could take first instead? Either way it'll probably skew whether pts are readmitted or not, or we could try to filter randomly*
+
+```{r}
+readmit_uniq <- readmit_data %>% 
+  arrange(-number_inpatient) %>%
+  filter(!duplicated(patient_nbr))
+
+str(readmit_uniq)
+
+#quick plot to see differences between readmission among all data and unique pt subset
+p1 <- ggplot(readmit_data, aes(x=readmitted)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..))) + 
+  ylim(0, 0.75) +
+  labs(title = "Readmission in Full Dataset", y="Percent")
+p2 <- ggplot(readmit_uniq, aes(x=readmitted)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..))) + 
+  ylim(0, 0.75) +
+  labs(title = "Readmission in Latest Hosp Subset", y="Percent")
+
+ggarrange(p1, p2, ncol = 2, common.legend=T, labels = )
+```
 
 # Research approach
 
