@@ -25,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, pROC)   #add your packages here
 ```
 
 
@@ -275,11 +275,120 @@ From the *Goals* section above, your study should respond to the following:
 
 The set of available predictors is not limited to the raw variables in the data set. You may engineer any factors using the data, that you think will improve your model's quality.
 
+To determine which factors play a role in patient readmission < 30 days, we use a `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these.  
+
+```{r run LASSO}
+
+#remove columns we don't want to include as predictors or y
+readmit_mod <- readmit_data %>% 
+  select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable
+  na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
+
+# generate matrices for LASSO
+Y <- as.matrix(readmit_mod[, "readmit_30"]) # extract Y and transform to matrix for LASSO to work
+X <- model.matrix(readmit_30 ~., data = readmit_mod)[, -1]  # for each factor: num of levels -1
+
+set.seed(100)  # seed for reproducibility 
+
+# run LASSO
+fit.readmit.cv <- cv.glmnet(X, Y,  alpha = 1, family = "binomial", nfolds = 10, type.measure = "deviance")
+
+# plotting
+plot(fit.readmit.cv)
+
+fit.readmit.cv$lambda.1se # use lambda.1se to select the smaller model
+coef.1se <- coef(fit.readmit.cv, s = "lambda.1se") # get coefficients
+coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coefficients
+
+# output variable names
+coef.1se <- rownames(as.matrix(coef.1se))[-1] 
+coef.1se
+```
+
+Next, we use `glm()` to generate the logistic regression model based on the above selected variables. 
+
+```{r run glm}
+
+# let's first select the variables identified through LASSO
+coef.1se <- coef(fit.readmit.cv, s="lambda.1se")  #s lambda value
+coef.1se <- coef.1se[which(coef.1se != 0),] # get the non-zero coefficients
+var.1se <- rownames(as.matrix(coef.1se))[-1] # output the variable names without intercept
+var.1se <- var.1se[-grep("diabetesMed|diag1_mod|disch_disp_modified|insulin", var.1se)] # remove factor levels (full factors are re-added below)
+readmit_mod_sub <-  readmit_mod %>%
+  select(c("diabetesMed", "diag1_mod", "disch_disp_modified", "insulin", "readmit_30", var.1se)) # get a subset with response and LASSO output
+
+# maybe we should consider splitting data here and only test model fit on part of the data? 
+
+# fit glm with LASSO-identified variables
+fit.logit.1 <- glm(readmit_30 ~. , family = binomial, data = readmit_mod_sub) # not sure if we should keep the full data or the readmit_mod without NAs?
+
+# check significance of variables
+Anova(fit.logit.1)
+
+```
+
 2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
+
+The model above indicates that time_in_hospital may potentially not have such an important role in classifying patient readmission < or > 30 days. Let's try removing this variable from the model. To determine the best model fit, we use a ROC curve comparison and the Chi-square test from `anova()`. 
+
+```{r choosing the best model}
+
+# create a reduced model fit without time_in_hospital
+fit.logit.2 <- update(fit.logit.1, .~. -time_in_hospital) 
+
+# ROC curve approach
+fit.logit.1.ROC <- roc(readmit_mod_sub$readmit_30, fit.logit.1$fitted) # getting model 1 ROC 
+fit.logit.2.ROC <- roc(readmit_mod_sub$readmit_30, fit.logit.2$fitted) # getting model 2 ROC 
+
+# plotting both ROC curves
+plot(1 - fit.logit.1.ROC$specificities, fit.logit.1.ROC$sensitivities, col = "red", lwd = 3, type = "l", # plotting the first curve
+     xlab = "False Positive", 
+     ylab = "Sensitivity")
+
+lines(1 - fit.logit.2.ROC$specificities, fit.logit.2.ROC$sensitivities, col="blue", lwd=3) # plotting the second curve 
+
+legend("bottomright",
+       c(paste0("fit1 AUC=", round(fit.logit.1.ROC$auc,2)), 
+         paste0("fit2 AUC=", round(fit.logit.2.ROC$auc, 2)), 
+       col=c("red", "blue"),
+       lty = 1)
+       
+       
+# compare full and reduced models
+anova(fit.logit.2, fit.logit.1, test = "Chisq")
+
+```
+
+While the ROC curves are practically identical, based on the Chi-squared test we cannot reject the null hypothesis that the reduced model is sufficient in explaining the data (`p = 0.06`) (right?). Thus, we will keep the reduced model excluding `time_in_hospital`.
+
+
+```{r}
+# check significance of variables in reduced model
+Anova(fit.logit.2)
+
+# more detailed summary
+summary(fit.logit.2)
+
+```
+
+All the variables are now significant. Based on the above analysis, readmission within 30 days is more likely for patients with diabetes medication, when they have been discharged to other locations types than home without health services (?), when they receive more medications and when they've visited the hospital more frequently (outpatient, inpatient, emergency and prior number of admissions to the hospital). **Does this interpretation make sense?**
+
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
 
 Suggestion: You may use any of the methods covered so far in parts 1) and 2), and they need not be the same. Also keep in mind that a training/testing data split may be necessary. 
+
+Bayes' rule can be used as a classification rule to minimize the cost according to specific weights. 
+
+```{r Bayes rule}
+
+# Applying Bayes rule
+fit.logit.2.bayes <- as.factor(ifelse(fit.logit.2$fitted > .17, "1", "0")) # not sure if we should use .17 as in the lecture or define it some other way?
+MCE.bayes <- (2 * sum(fit.logit.2.bayes[readmit_mod_sub$readmit_30 == "1"] != "1") 
+                      + sum(fit.logit.2.bayes[readmit_mod_sub$readmit_30 == "0"] != "0"))/length(readmit_mod_sub$readmit_30)
+MCE.bayes
+
+```
 
 4) We suggest you to split the data first to Training/Testing/Validation data:
 
