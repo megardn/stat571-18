@@ -1,5 +1,5 @@
 ---
-title: " Modern Data Mining, HW 4"
+title: " Modern Data Mining, HW 4 - Group 18"
 author:
 - Group Member 1
 - Group Member 2
@@ -145,11 +145,34 @@ Conceptual questions to understand the building blocks of logistic regression. A
 
 i. Take a random subsample of size 5 from `hd_data_f` which only includes `HD` and `SBP`. Also set  `set.seed(50)`. List the five observations neatly below. No code should be shown here.
 
+```{r}
+set.seed(50) # set seed
+hd_data.f_subset <- hd_data.f[sample(nrow(hd_data.f), 5), ] %>% # pick random 5 subjects
+  select(HD, SBP) # only get HD and SBP
+hd_data.f_subset
+```
+
 ii. Write down the likelihood function using the five observations above.
+
+LIKELIHOOD(B_0, B_1 | Data) = (1/(1+e^(B_0 + 152*B_1))) * (1/(1+e^(B_0 + 110*B_1))) * (1/(1+e^(B_0 + 154*B_1))) * (1/(1+e^(B_0 + 160*B_1))) * (1/(1+e^(B_0 + 182*B_1)))
 
 iii. Find the MLE based on this subset using glm(). Report the estimated logit function of `SBP` and the probability of `HD`=1. Briefly explain how the MLE are obtained based on ii. above.
 
+```{r}
+mini_fit <- glm(HD~SBP,hd_data.f_subset, family=binomial(logit)) # fit based on the subset
+summary(mini_fit)$coefficients[,1] # report the MLE
+```
+
+The estimated logit function is logit = -2.546 + 0.014*SBP. The MLE was obtained by testing parameters (B_0 and B_1), and calculating the likelihood that we'd see this given the data. The MLE is thus chosen as the parameters that maximize this likelihood. In terms of the likelihood function in ii, we select the B_0 and B_1 that output the greatest value in this function.  
+
 iv. Evaluate the probability of Liz having heart disease. 
+```{r}
+mini_fit.pred <- predict(mini_fit, hd_data.new, type="response")
+mini_fit.pred
+```
+
+Based on the mode fit to the randomly sampled 5 subjects, Liz's probability of having heart disease is 0.242. 
+
 
 ### Identify important risk factors for `Heart.Disease.`
 
@@ -160,25 +183,59 @@ summary(fit1)
 fit1.1 <- glm(HD~SBP + AGE, hd_data.f, family=binomial)
 summary(fit1.1)
 # you will need to finish by adding each other variable 
-# fit1.2...
+fit1.2 <- glm(HD~SBP + AGE + SEX, hd_data.f, family=binomial)
+summary(fit1.2)
+fit1.3 <- glm(HD~SBP + AGE + SEX + DBP, hd_data.f, family=binomial)
+summary(fit1.3)
+fit1.4 <- glm(HD~SBP + AGE + SEX + DBP + CHOL, hd_data.f, family=binomial)
+summary(fit1.4)
+fit1.5 <- glm(HD~SBP + AGE + SEX + DBP + CHOL + FRW, hd_data.f, family=binomial)
+summary(fit1.5)
+fit1.6 <- glm(HD~SBP + AGE + SEX + DBP + CHOL + FRW + CIG, hd_data.f, family=binomial)
+summary(fit1.6)
 ```
 
 i. Which single variable would be the most important to add?  Add it to your model, and call the new fit `fit2`.  
 
 We will pick up the variable either with highest $|z|$ value, or smallest $p$ value. Report the summary of your `fit2` Note: One way to keep your output neat, we will suggest you using `xtable`. And here is the summary report looks like.
+
+It seems the most important variable to add would be SEX based on both pvalue and z value.
+
 ```{r the most important addition, results='asis', comment="   "}
 ## How to control the summary(fit2) output to cut some junk?
 ## We could use packages: xtable or broom. 
 ## Assume the fit2 is obtained by SBP + AGE
 library(xtable)
 options(xtable.comment = FALSE)
-fit2 <- glm(HD~SBP + AGE, hd_data.f, family=binomial)
+fit2 <- glm(HD~SBP + AGE + SEX, hd_data.f, family=binomial)
 xtable(fit2)
 ```
 
 ii. Is the residual deviance of `fit2` always smaller than that of `fit1`? Why or why not?
+
+Yes. This is because fit2 has the variable that fit1 uses, but also additional variables. So, even if the new variable is not informative whatsoever, it will be at least as accurate. 
   
 iii. Perform both the Wald test and the Likelihood ratio tests (Chi-Squared) to see if the added variable is significant at the .01 level.  What are the p-values from each test? Are they the same? 
+
+```{r}
+confint.default(fit2, level = 0.99) # Wald Test
+
+# generate p-values for Wald's test (reference: https://doi.org/10.1136/bmj.d2304)
+SE1 <- as.numeric(diff(confint.default(fit2, level = 0.99)[2,])/(2*2.57))
+SE2 <- as.numeric(diff(confint.default(fit2, level = 0.99)[3,])/(2*2.57))
+SE3 <- as.numeric(diff(confint.default(fit2, level = 0.99)[4,])/(2*2.57))
+z1 <- summary(fit2)$coefficients[2,1]/SE1
+z2 <- summary(fit2)$coefficients[3,1]/SE2
+z3 <- summary(fit2)$coefficients[4,1]/SE3
+p1 <- exp(-(0.717*z1) - (0.416*z1^2))
+p2 <- exp(-(0.717*z2) - (0.416*z2^2))
+p3 <- exp(-(0.717*z3) - (0.416*z3^2))
+c(p1, p2, p3)
+
+anova(fit2, test="Chisq") # Likelihood Ratio Test, via chi-square
+```
+
+Yes, all variables are significant at the 0.01 level. The p-values for the chi-squared test are as reported above (5.9e-13, 4.4e-05, 6.0e-11 for SBP, AGE, SEX respectively). The p-values for Wald's test are 7.73e-13, 9.07e-05, 4.41e-10 for SBP, AGE, SEX respectively. These are not the same across tests. 
 
 ###  Model building
 
