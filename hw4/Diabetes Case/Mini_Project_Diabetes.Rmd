@@ -1,6 +1,9 @@
 ---
 title: "Predicting readmission probability for diabetes inpatients"
-author: "Modern Data Mining"
+author: 
+- Diego G. Dávila
+- Joëlle Bagautdinova
+- Margaret Gardner
 date: ' '
 output:
   pdf_document:
@@ -22,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr, bestglm, pROC)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr, bestglm, pROC, caret)   #add your packages here
 ```
 
 
@@ -214,16 +217,8 @@ We can observe that:
 Further exploratory visualizations are performed to obtain an initial sense of which variables may play a role in whether patients are readmitted within 30 days or not:
 
 ```{r visualizing readmit_30 and other variables}
-
-#DO we want to do this EDA in the subset or full dataset? Maybe keep full dataset and reorder?
-
-# demographic variables - this output is quite ugly, we might want to substitute with individual plots for each demographic factor in relation to readmit_30
-# readmit_data %>% 
-#   select(readmit_30, race, age_mod, gender) %>% 
-#   ggpairs(aes(color = readmit_30))
-
 # plotting gender
-readmit_data %>%
+readmit_uniq %>%
   filter(gender == "Female" | gender == "Male") %>%
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
@@ -231,14 +226,14 @@ readmit_data %>%
     labs(title = "Readmission within 30 days by gender", y="Percent")
 
 # plotting age bins
-readmit_data %>%
+readmit_uniq %>%
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~age_mod) +
     labs(title = "Readmission within 30 days by age bins", y="Percent")
 
 # plotting race
-readmit_data %>%
+readmit_uniq %>%
   drop_na(race) %>% #drop NAs before plotting - makes sense i think?
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
@@ -247,7 +242,7 @@ readmit_data %>%
 
 
 # plotting medications
-readmit_data %>% 
+readmit_uniq %>% 
   tidyr::pivot_longer(cols = metformin:insulin, 
                names_to = "Medication",
                values_to = "Trend") %>% 
@@ -257,17 +252,25 @@ readmit_data %>%
     labs(title = "Readmission within 30 days by medication trends", y="Percent")
 
 # plotting change in rx
-readmit_data %>%
+readmit_uniq %>%
   drop_na(change) %>% #drop NAs before plotting - makes sense i think?
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~change) +
     labs(title = "Readmission within 30 days by change in diabetes", y="Percent")
 
+# plotting change in rx
+readmit_uniq %>%
+  drop_na(disch_disp_modified) %>% #drop NAs before plotting - makes sense i think?
+  ggplot(aes(x = readmit_30)) + 
+    geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
+    facet_wrap(~disch_disp_modified) +
+    labs(title = "Discharge location within 30 days by change in diabetes", y="Percent")
+
 # could do the same for the remaining factors about diabetes medication, discharge, admission
 
 # numerical variables
-readmit_data %>% 
+readmit_uniq %>% 
   select(readmit_30, time_in_hospital, num_lab_procedures, num_procedures, num_medications, 
          number_outpatient, number_inpatient, number_emergency, nb_admissions, number_diagnoses) %>% 
   ggpairs(aes(color = readmit_30))
@@ -301,13 +304,13 @@ idx_val <- which(! idx_no_train %in% idx_test)
 data.train <- as.data.frame(readmit_uniq[idx_train,])
 data.test <- as.data.frame(readmit_uniq[idx_test,])
 data.val <- as.data.frame(readmit_uniq[idx_val,])
-data.train.lasso <- rbind(data.train, data.test)
 ``` 
 
 To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary, and so we'll incorporate these data points into the training dataset for this test.
 
 ```{r run LASSO}
 #remove columns we don't want to include as predictors or y
+data.train.lasso <- rbind(data.train, data.test)
 readmit_mod <- data.train.lasso %>% 
   select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable
   na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
@@ -331,10 +334,7 @@ var.1se <- rownames(as.matrix(coef.1se))[-1] # output variable names without int
 var.1se
 ```
 
-Try running with gLASSO? If you create dummy variables encoding each factor variable, this will keep all factor levels together; seems like a lot of work circle back to this!
-
-
-Now we use the predictors identified to build our model on `data.train`.
+Now we use the predictors identified to build our model on the LASSO training subset.
 
 ```{r LASSO model}
 # let's first select the variables identified through LASSO - for now dropping factor levels and readding full variable
@@ -350,16 +350,16 @@ fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.lasso.m)
 Anova(fit.logit.1)
 ```
 
-All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. This makes sense because ...
+All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. Each predictor identified also makes sense logically: increased age would be correlated with disease severity and the ability to recover from acute diabetes complications; the  number of inpatient hospitalizations in the previous year would also correlate with overall health status and disease severity; and the discharge location would strongly influence the type of recuperative care that patients receive post-hospitalization, which could prevent readmission. 
 
 2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
 
-We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge: *note - originally used LASSO outputs as starting point but then the model was super small and very redundant*
+We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge. `Race` and `age_mod` were included due to the observed potential associations of Race=Caucasian and age_mod=60-70 yrs, respectively,  with readmission in our EDA; `gender` was included as part of biomedical convention, as sex differences have been observed in many diseases and can have large consequences for public health; and `num_medications` was chosen as a proxy for disease severity, as patients requiring more medications during hospitalization likely suffer a more severe or complex form of disease and may be more likely to relapse.
 
 ```{r bestglm}
 # mod data.train
 data.train.m <- data.train %>% 
-  select(c("readmit_30", "race", "gender", "age_mod", "num_medications")) %>% # "change", "number_diagnoses" "disch_disp_modified", "adm_typ_mod", "diag1_mod"
+  select(c("readmit_30", "race", "gender", "age_mod", "num_medications")) %>%
   na.omit() # omitting NAs (model.matrix also removes them by default)
 
 # Get the design matrix without 1's and HD
@@ -376,7 +376,7 @@ summary(fit.glm.1)
 Anova(fit.glm.1)
 ```
 
-Interestingly, race is not significant so we can remove it from the model.
+`Race` is not significant so we will remove it from the model.
 
 ``` {r bestglm model}
 fit.glm.final <- glm(readmit_30~age_mod+num_medications, family=binomial, data=data.test)
@@ -384,10 +384,10 @@ Anova(fit.glm.final)
 summary(fit.glm.final)$dispersion
 ```
 
-Now we'll compare the bestglm and LASSO models' on AUC/ROC to see which one is best for prediction. 
+Now we'll compare the bestglm and LASSO models' on AUC/ROC; Anova to see which one is best for prediction. *add chi sq and Anova*
 
-
-```{r}
+```{r model.comp}
+#plot ROC & AUC
 fit.glm.final.roc <- roc(data.test$readmit_30, fit.glm.final$fitted) #bestglm model on data.test
 fit.logit.1.roc <- roc(data.train.lasso$readmit_30, fit.logit.1$fitted) #LASSO model on data.train.lasso
 plot(1-fit.glm.final.roc$specificities, 
@@ -400,25 +400,53 @@ legend("bottomright",
          paste0("fit.logit.1 (LASSO) AUC=", round(fit.logit.1.roc$auc, 2))),
        col=c("red", "blue"),
        lty=1)
+
+# #chi-square - can't compare directly with anova because of different sizes, not sure what to do here
+# anova(fit.glm.final, fit.logit.1)
 ```
 
-The ROC curve and AUC clearly indicate that our final LASSO model is superior to the bestglm model. We'll proceed with prediction using `fit.logit.1` as our final model.
+The ROC curve and AUC clearly indicate that our final LASSO model is superior to the bestglm model across thresholds. We'll next compare prediction using starting we'll threshold our probability of readmission at 1/2. 
 
-To start, we'll threshold our probability of readmission at 1/2.
+```{r confusion}
+#run classification on LASSO model
+fit.pred.1 <- ifelse(fit.logit.1$fitted > 1/2, "1", "0")
+#confusion matrix
+confusionMatrix(data = as.factor(fit.pred.1),         # predicted value
+                       reference = data.train.lasso.m$readmit_30,              # true results as reference
+                       positive = levels(data.train.lasso.m$readmit_30)[2])    # readmission level
 
-```{r classify half}
-#run classification
-fit.pred.1 <- ifelse(fit.logit.1$fitted > 1/2, "1", "0") #y hat
+#run classification on bestglm model
+fit.pred.2 <- ifelse(fit.glm.final$fitted > 1/2, "1", "0")
+#confusion matrix
+confusionMatrix(data = as.factor(fit.pred.2),         # predicted value
+                       reference = data.test$readmit_30,              # true results as reference
+                       positive = levels(data.test$readmit_30)[2])    # readmission level
 
-#set.seed(10)
-# output1 <- data.frame(data.train.lasso.m$readmit_30, fit.pred.1, fit.logit.1$fitted)[sample(57213, 15),] #set to 15 so we have at least 1 y=1
-
-#compare readmission with prediction via confusion matrix - rows = predicted values, cols = actual
-cm.1 <- table(fit.pred.1, data.train.lasso.m$readmit_30)
-cm.1
+#getting:
+## Warning in confusionMatrix.default(data = as.factor(fit.pred.2), reference = data.test$readmit_30,  :
+##   Levels are not in the same order for reference and data. Refactoring data to match.
+#tried outputting prediction simplified - dont think the factors are out of order...?
+output1 <- data.frame(data.test$readmit_30, fit.pred.2, fit.glm.final$fitted)[sample(14303, 10),] 
+names(output1) <- c( "Readmission", "Predicted Readmission", "Prob")
+output1
 ```
 
-Setting the threshold to 0.5 gives a sensitivity of _ and specificity of _. *to do: Fine-tune based on what seems to make sense with ROC curve*
+Comparing on a threshold of 1/2 again confirms that the LASSO-generated model is superior on sensitivity (0.008 vs 0). While the bestglm model has better specificity (1 vs 0.999), it failed to identify any cases of readmission and the LASSO model's specificity was also very high. Based on its superior ROC, AUC, and balance of sensitivity and specificity, we will proceed with the LASSO-generated model as our final predictive model.
+
+Next we'll choose threshold that balances sensitivity and specificity of our model. We choose a model with sensitivity of ~60% to maximize our chances of identifying patients at risk for readmission. While this will increase the false positive rate, potentially causing hospitals to spend additional money caring for patients who would not have been readmitted, this is preferable from a health-standpoint.
+
+``` {r threshold}
+#find threshold
+sense.60 <- fit.logit.1.roc$sensitivities[15]
+coords(fit.logit.1.roc, sense.60, input="sensitivity", ret=c("threshold", "specificity", "sensitivity"))
+
+#rerun classification with new threshold
+fit.pred.3 <- ifelse(fit.logit.1$fitted > 0.0659, "1", "0")
+#confusion matrix
+confusionMatrix(data = as.factor(fit.pred.3),         # predicted value
+                       reference = data.train.lasso.m$readmit_30,              # true results as reference
+                       positive = levels(data.train.lasso.m$readmit_30)[2])    # readmission level
+```
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
 
@@ -426,17 +454,25 @@ Bayes' rule can be used as a classification rule to minimize the cost according 
 then the Bayes rule is thresholding over the 
 $$\hat P(Y=1 \vert x) > \frac{0.5}{(1+0.5)}=0.333$$ 
 
-Therefore we'll use Bayes thresholding on our final model.  *run on training&testing or validation data? Both?*
+Therefore we'll use Bayes thresholding on our final model:
 
 ```{r Bayes rule}
 # Applying Bayes rule
-fit.logit.1.bayes <- as.factor(ifelse(fit.logit.1$fitted > .333, "1", "0"))
-MCE.bayes <- (2 * sum(fit.logit.1.bayes[data.train.lasso.m$readmit_30 == "1"] != "1") 
-                      + sum(fit.logit.1.bayes[data.train.lasso.m$readmit_30 == "0"] != "0"))/length(data.train.lasso.m$readmit_30)
-MCE.bayes
+fit.logit.1.bayes <- ifelse(fit.logit.1$fitted > .333, "1", "0")
+fit.logit.bayes.f <- as.factor(fit.logit.1.bayes)
+
+#calculate MCE
+MCE.bayes <- (2 * sum(fit.logit.bayes.f[data.train.lasso.m$readmit_30 == "1"] != "1") 
+                      + sum(fit.logit.bayes.f[data.train.lasso.m$readmit_30 == "0"] != "0"))/length(data.train.lasso.m$readmit_30)
+MCE.bayes 
+
+#confusion matrix with new threshold
+confusionMatrix(data = as.factor(fit.logit.1.bayes),         # predicted value
+                       reference = data.train.lasso.m$readmit_30,              # true results as reference
+                       positive = levels(data.train.lasso.m$readmit_30)[2])    # readmission level
 ```
 
-*MCE.bayes looks pretty bad... to do: check sensitivity/specificty vs our predictions from part 2 and make some kind of comment about it*
+The predictions returned via our Bayes rule threshold have much lower sensitivity (0.02 vs 0.60) but also much higher specificity (0.99 vs 0.63) than our 60% specificity model. This 
 
 Suggestion: You may use any of the methods covered so far in parts 1) and 2), and they need not be the same. Also keep in mind that a training/testing data split may be necessary. 
 
@@ -444,7 +480,22 @@ Suggestion: You may use any of the methods covered so far in parts 1) and 2), an
 
 - Use training/testing data to land a final model (If you only use LASSO to land a final model, we will not need testing data since all the decisions are made with cross-validations.)
 
-- *Evaluate the final model with the validation data to give an honest assessment of your final model*. 
+- *Evaluate the final model with the validation data to give an honest assessment of your final model*.
+
+To create a final evaluation of our model, we will calculate AUC and MCE on our `data.val` subset. We will threshold our data at 0.333 per our Bayes rule.
+
+
+```{r validation}
+#calculate AUC
+fit.logit.val <- predict(fit.logit.1, data.val, type="response")
+pROC::auc(data.val$readmit_30, fit.logit.val)
+
+#calculate MCE
+MCE.val <- (2 * sum(fit.logit.bayes.f[data.val$readmit_30 == "1"] != "1") 
+                      + sum(fit.logit.bayes.f[data.val$readmit_30 == "0"] != "0"))/length(data.val$readmit_30)
+MCE.val
+```
+
 
 # The write up
 
