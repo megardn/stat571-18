@@ -181,12 +181,19 @@ Remove duplicate patient IDs such that we only have the last inpatient admission
 
 ## Visual summary
 
-```{r}
-readmit_uniq <- readmit_data %>% 
-  arrange(-number_inpatient) %>%
-  filter(!duplicated(patient_nbr))
+Because logistic regression depends on observations being independent, we subsetted by selecting only one random hospitalization for each individual patient. We will perform further EDA and further modelling on this subsetted sample.
 
+
+```{r}
+
+#filter unique pt's random hospitalizations
+set.seed(100) #seed for reproducibility
+readmit_uniq <- readmit_data %>% 
+   group_by(patient_nbr) %>%
+   sample_n(1) %>%
+  ungroup()
 str(readmit_uniq)
+sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)
 
 #quick plot to see differences between readmission among all data and unique pt subset
 p1 <- ggplot(readmit_data, aes(x=readmitted)) + 
@@ -196,21 +203,22 @@ p1 <- ggplot(readmit_data, aes(x=readmitted)) +
 p2 <- ggplot(readmit_uniq, aes(x=readmitted)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmitted)) + 
   ylim(0, 0.75) +
-  labs(title = "Readmission in Latest Hosp Subset", y="Percent")
+  labs(title = "Readmission in Random Hosp Subset", y="Percent")
 p3 <- ggplot(readmit_data, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission < or > 30 days in Full Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in Full Hosp Subset", y="Percent")
 p4 <- ggplot(readmit_uniq, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission < or > 30 days in Latest Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in Random Hosp Subset", y="Percent")
 
 ggarrange(p1, p2, ncol = 2, common.legend = T)
 ggarrange(p3, p4, ncol = 2, common.legend = T)
+
 ```
 
 We can observe that:
 * around 10% of the full sample is readmitted within 1 month
-* around 3% of the latest hospital admission is readmitted within 1 month
+* around 7% of the latest hospital admission is readmitted within 1 month
 
 Further exploratory visualizations are performed to obtain an initial sense of which variables may play a role in whether patients are readmitted within 30 days or not:
 
@@ -222,47 +230,49 @@ Further exploratory visualizations are performed to obtain an initial sense of w
 #   ggpairs(aes(color = readmit_30))
 
 # plotting gender
-readmit_data %>%
+readmit_uniq %>%
   filter(gender == "Female" | gender == "Male") %>%
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~gender) +
-    labs(title = "Readmission < or > 30 days by gender", y="Percent")
+    labs(title = "Readmission within 30 days by gender", y="Percent")
 
 # plotting age bins
-readmit_data %>%
+readmit_uniq %>%
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~age_mod) +
-    labs(title = "Readmission < or > 30 days by age bins", y="Percent")
+    labs(title = "Readmissio nwithin 30 days by age bins", y="Percent")
 
 # plotting race
-readmit_data %>%
+readmit_uniq %>%
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~race) +
-    labs(title = "Readmission < or > 30 days by race", y="Percent")
+    labs(title = "Readmission within 30 days by race", y="Percent")
 
 
 # plotting medications
-readmit_data %>% 
+readmit_uniq %>% 
   tidyr::pivot_longer(cols = metformin:insulin, 
                names_to = "Medication",
                values_to = "Trend") %>% 
   ggplot(aes(Trend, Medication, fill = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..)), position = "dodge") + 
     facet_wrap(~Medication) +
-    labs(title = "Readmission < or > 30 days by medication trends", y="Percent")
+    labs(title = "Readmission within 30 days by medication trends", y="Percent")
 
-# could do the same for the remaining factors about diabetes medication, discharge, admission
+# add change plot 
+
+# add discharge plot
 
 # numerical variables
-readmit_data %>% 
+readmit_uniq %>% 
   select(readmit_30, time_in_hospital, num_lab_procedures, num_procedures, num_medications, 
          number_outpatient, number_inpatient, number_emergency, nb_admissions, number_diagnoses) %>% 
   ggpairs(aes(color = readmit_30))
 ```
-Based on the above plots, readmissions within 30 days may potentially occur more frequently in 60-70 year old patients and in Caucasian patients, although it should be noted that the sample contains an overrepresentation of the Caucasian population in general. Numerical variables do not show clear differences between patients admitted < or > 30 days.  
+Based on the above plots, readmissions within 30 days may potentially occur more frequently in 60-70 year old patients and in Caucasian patients, although it should be noted that the sample contains an overrepresentation of the Caucasian population in general. Numerical variables do not show clear differences between patients admitted within 30 days or not.  
 
 
 # Research approach
@@ -275,12 +285,36 @@ From the *Goals* section above, your study should respond to the following:
 
 The set of available predictors is not limited to the raw variables in the data set. You may engineer any factors using the data, that you think will improve your model's quality.
 
-To determine which factors play a role in patient readmission < 30 days, we use a `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these.  
+We first split the data into `data.train`(60%), `data.test` (20%) and `data.val` (20%). 
+
+```{r}
+
+# Split the data
+N <- length(readmit_uniq$patient_nbr)
+n1 <- floor(.6*N)
+n2 <- floor(.2*N)
+set.seed(10)
+# Split data to three portions of .6, .2 and .2 of data size N
+idx_train <- sample(N, n1)
+idx_no_train <- (which(! seq(1:N) %in% idx_train))
+idx_test <- sample(idx_no_train, n2)
+idx_val <- which(! idx_no_train %in% idx_test)
+data.train <- as.data.frame(readmit_uniq[idx_train,])
+data.test <- as.data.frame(readmit_uniq[idx_test,])
+data.val <- as.data.frame(readmit_uniq[idx_val,])
+
+data.train.lasso <- rbind(data.train, data.test) # combine training and testing datasets for LASSO
+
+``` 
+
+To determine which factors play a role in patient readmission < 30 days, we use a `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary, and so we'll incorporate these data points into the training dataset for this test.
 
 ```{r run LASSO}
 
+# TODO: need to replace readmit_data with readmit_uniq
+
 #remove columns we don't want to include as predictors or y
-readmit_mod <- readmit_data %>% 
+readmit_mod <- data.train.lasso %>% 
   select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable
   na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
 
@@ -303,7 +337,20 @@ coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coeff
 # output variable names
 coef.1se <- rownames(as.matrix(coef.1se))[-1] 
 coef.1se
+
+# determine prediction accuracy (classification)
+pred.fit.readmit.cv <- predict(fit.readmit.cv, s = fit.readmit.cv$lambda.1se, newx = readmit_mod, type = "response")
+
+# generate confusion matrix
+cm <- table(pred.fit.readmit.cv, readmit_mod$readmit_30)
+cm
+
+confusionMatrix(cm)
+
 ```
+
+
+Now we use the predictors identified to build our model on `data.train`.
 
 Next, we use `glm()` to generate the logistic regression model based on the above selected variables. 
 
@@ -317,15 +364,16 @@ var.1se <- var.1se[-grep("diabetesMed|diag1_mod|disch_disp_modified|insulin", va
 readmit_mod_sub <-  readmit_mod %>%
   select(c("diabetesMed", "diag1_mod", "disch_disp_modified", "insulin", "readmit_30", var.1se)) # get a subset with response and LASSO output
 
-# maybe we should consider splitting data here and only test model fit on part of the data? 
-
 # fit glm with LASSO-identified variables
-fit.logit.1 <- glm(readmit_30 ~. , family = binomial, data = readmit_mod_sub) # not sure if we should keep the full data or the readmit_mod without NAs?
+fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.m) # not sure if we should keep the full data or the readmit_mod without NAs? - think we should keep the NAs in
 
 # check significance of variables
 Anova(fit.logit.1)
 
 ```
+
+All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. This makes sense because ...
+
 
 2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
 
@@ -351,7 +399,7 @@ legend("bottomright",
        c(paste0("fit1 AUC=", round(fit.logit.1.ROC$auc,2)), 
          paste0("fit2 AUC=", round(fit.logit.2.ROC$auc, 2)), 
        col=c("red", "blue"),
-       lty = 1)
+       lty = 1))
        
        
 # compare full and reduced models
@@ -360,7 +408,6 @@ anova(fit.logit.2, fit.logit.1, test = "Chisq")
 ```
 
 While the ROC curves are practically identical, based on the Chi-squared test we cannot reject the null hypothesis that the reduced model is sufficient in explaining the data (`p = 0.06`) (right?). Thus, we will keep the reduced model excluding `time_in_hospital`.
-
 
 ```{r}
 # check significance of variables in reduced model
@@ -372,6 +419,25 @@ summary(fit.logit.2)
 ```
 
 All the variables are now significant. Based on the above analysis, readmission within 30 days is more likely for patients with diabetes medication, when they have been discharged to other locations types than home without health services (?), when they receive more medications and when they've visited the hospital more frequently (outpatient, inpatient, emergency and prior number of admissions to the hospital). **Does this interpretation make sense?**
+
+
+We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge: *note - originally used LASSO outputs as starting point but then the model was super small and very redundant*
+
+```{r bestglm}
+# mod data.train
+data.train.m <- data.train %>% 
+  select(c("readmit_30", "race", "gender", "age_mod")) %>% #, "num_medications", "change", "number_diagnoses" "disch_disp_modified", "adm_typ_mod", "diag1_mod"
+  na.omit() # omitting NAs (model.matrix also removes them by default)
+# Get the design matrix without 1's and HD
+Xy_design <- model.matrix(readmit_30 ~.+0, data.train.m) #+0 -> no intercept, gets rid of first col with 1s
+# Attach y as the last column.
+Xy <- data.frame(Xy_design, data.train.m$readmit_30)   
+fit.glm.1 <- bestglm(Xy, family = binomial, method = "forward", IC="AIC") #using forward selection for efficiency
+names(fit.glm.1) # fit.all$Subsets to list best submodels
+```
+
+Compare bestglm and LASSO models on AUC/ROC, pick sensitivity threshold -> prediction
+
 
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
