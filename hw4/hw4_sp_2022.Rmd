@@ -1,9 +1,9 @@
 ---
 title: " Modern Data Mining, HW 4 - Group 18"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Dávila
+- Joëlle Bagautdinova
+- Margaret Gardner 
 date: '11:59 pm, 03/20, 2021'
 output:
   pdf_document:
@@ -323,7 +323,7 @@ legend("bottomright",
        lty=1)
 ```
 
-Fit2 will always have a larger AUC than Fit1 because it has more variables. Our classifier can only be as or more accurate with more complexity (as long as Fit2 includes all the variables of Fit1 and more). Similarly, one curve will always contain the other, as it can only be more accurate the more complex it is. 
+In this specific case, Fit2 will always have a larger AUC than Fit1 because it has more variables (while including the variables already in Fit1). Our classifier can only be as or more accurate with more complexity (as long as Fit2 includes all the variables of Fit1 and more). The more complex model will always overlap or contain the curve of the less complex model under these conditions. 
 
 iii.  Estimate the Positive Prediction Values and Negative Prediction Values for `fit1` and `fit2` using .5 as a threshold. Which model is more desirable if we prioritize the Positive Prediction values?
 
@@ -375,7 +375,7 @@ par(new=TRUE)
 plot(thresholds,fit1.neg.pred, axes=F, ylab=NA, col = 'Red', type="l")
 legend("bottomright", 
        c("Positive", "Negative"),
-       col = c("Blue", "Red"))
+       col = c("Blue", "Red"), lty=1)
 
 # Plot fit2 values
 plot(thresholds,fit2.pos.pred, ylab="Pos./Neg. Pred. Val", main = "Fit2 Pos./Neg. Pred. Val by Threshold", col = 'Blue', type="l")
@@ -383,7 +383,7 @@ par(new=TRUE)
 plot(thresholds,fit2.neg.pred, axes=F, ylab=NA, col = 'Red', type="l")
 legend("bottomright", 
        c("Positive", "Negative"),
-       col = c("Blue", "Red"))
+       col = c("Blue", "Red"),lty=1)
 
 ```
 
@@ -397,14 +397,13 @@ Bayes rules with risk ratio $\frac{a_{10}}{a_{01}}=10$ or $\frac{a_{10}}{a_{01}}
 
 i.  Write down the linear boundary for the Bayes classifier if the risk ratio of $a_{10}/a_{01}=10$.
 
-P̂(Y=1|x)  >(0.1/1+0.1)
+P̂(Y=1|x) >(0.1/1+0.1 ) =0 .0909
 
-logit > log(0.0909/0.909)
 
 ii. What is your estimated weighted misclassification error for this given risk ratio?
 
 ```{r}
-final.model.bayes <- as.factor(ifelse(final.model$fitted > 0.0909, "1", "0"))
+final.model.bayes <- as.factor(ifelse(final.model$fitted >  0.1/(1+0.1), "1", "0"))
 MCE.bayes <- (10*sum(final.model.bayes[hd_data.f$HD == "1"] != "1")
               + sum(final.model.bayes[hd_data.f$HD == "0"] != "0"))/length(hd_data.f$HD)
 MCE.bayes
@@ -432,9 +431,10 @@ for (i in seq(1, length(thresholds))){
               + sum(final.model.bayes.test[hd_data.f$HD == "0"] != "0"))/length(hd_data.f$HD)
 }
 plot(thresholds, bayes.mce, main = "MCE vs Threshold, a_10/a_01 = 10", ylab = 'MCE', type = 'l')
+abline(v = 0.1/(1+0.1), col='black')
 ```
 
-As we can see, under the assumption that a_10/a_01, the threshold given to us by Bayes rule does very well in finding the optimal threshold to minimize MCE.  
+As we can see, under the assumption that a_10/a_01, the threshold given to us by Bayes rule does very well in finding the optimal threshold (0.0909) to minimize MCE.  
 
 vi. Use weighted misclassification error, and set $a_{10}/a_{01}=1$. How well does the Bayes rule classifier perform? 
 
@@ -447,10 +447,11 @@ for (i in seq(1, length(thresholds))){
               + sum(final.model.one.test[hd_data.f$HD == "0"] != "0"))/length(hd_data.f$HD)
 }
 plot(thresholds, one.mce, main = "MCE vs Threshold, a_10/a_01 = 1", ylab = 'MCE', type = 'l')
+abline(v = 1/(1+1), col='black')
 
 ```
 
-Now, the threshold given to us by the older Bayes rule assumptions does not do well in finding the optimal threshold to minimize MCE. This is of course because we've changed the assumptions of relative cost, so we would have to re-calculate the appropriate threshold under the new a_10/a_01 assumption. 
+As we can see, Bayes rule does well at finding the threshold (0.5 in this case) at which the MCE is minimized, given the appropriate risk ratio. This is illustrated by the new threshold given the 1/1 ratio. 
 
 
 # Part II: Project
