@@ -275,37 +275,34 @@ From the *Goals* section above, your study should respond to the following:
 
 1) Identify important factors that capture the chance of a readmission within 30 days. 
 
-We first split the data into `data.train`, `data.test` and `data.val`. 
+We first split the data into `data.train` (70% of our data) and `data.val` (30%). 
 
 ```{r}
-# Split the data - using unique pt admissions randomly sampled for now:
+# Split the data
 N <- length(readmit_rand$patient_nbr)
-n1 <- floor(.6*N)
-n2 <- floor(.2*N)
+n1 <- floor(.7*N)
 
 set.seed(10)
 # Split data to three portions of .6, .2 and .2 of data size N
 
 idx_train <- sample(N, n1)
-idx_no_train <- (which(! seq(1:N) %in% idx_train))
-idx_test <- sample(idx_no_train, n2)
-idx_val <- which(! idx_no_train %in% idx_test)
-data.train <- readmit_rand[idx_train,]
-data.test <- readmit_rand[idx_test,]
-data.val <- readmit_rand[idx_val,]
+idx_val <- (which(! seq(1:N) %in% idx_train))
+data.train <- as.data.frame(readmit_rand[idx_train,])
+data.val <- as.data.frame(readmit_rand[idx_val,])
 ``` 
 
-To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. The model will be built using our training dataset and validated with the validation subset.  
+To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary.*NOTE - that's true right?*
 
 ```{r run LASSO}
 #remove columns we don't want to include as predictors or y
-readmit_mod <- readmit_rand %>% 
-  select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable - pt keeps getting added back in for me
+readmit_mod <- data.train %>% 
+  select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable
   na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
 
 # generate matrices for LASSO
 Y <- as.matrix(readmit_mod[, "readmit_30"]) # extract Y and transform to matrix for LASSO to work
 X <- model.matrix(readmit_30 ~., data = readmit_mod)[, -1]  # for each factor: num of levels -1
+
 set.seed(100)  # seed for reproducibility 
 
 # run LASSO
@@ -317,53 +314,32 @@ plot(fit.readmit.cv)
 fit.readmit.cv$lambda.1se # use lambda.1se to select the smaller model
 coef.1se <- coef(fit.readmit.cv, s = "lambda.1se") # get coefficients
 coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coefficients
-
-# output variable names
-coef.1se <- rownames(as.matrix(coef.1se))[-1] 
-coef.1se
+var.1se <- rownames(as.matrix(coef.1se))[-1] # output variable names without interceptt
+var.1se
 ```
 
+Try running with gLASSO. If you create dummy variables encoding each factor variable, this will keep all factor levels together; seems like a lot of work circle back to this!
 
-Let's use bestglm to find models with the smallest AIC:
+
+Now we use the predictors identified to build our model on `data.train`.
 
 ```{r results=TRUE}
-# Get the design matrix without 1's and HD
-Xy_design <- model.matrix(readmit_30 ~.+0, data.train) #+0 -> no intercept, gets rid of first col with 1s
-# Attach y as the last column.
-Xy <- data.frame(Xy_design, fram_data.f$HD)   
+# let's first select the variables identified through LASSO - for now dropping factor levels and readding full variable
+var.1se <- var.1se[-grep("disch_disp_modified|age_mod", var.1se)] # remove factor levels
+var.1se <- append(var.1se, c("disch_disp_modified", "age_mod")) # replace levels with full factors
+data.train.m <- data.train %>%
+  select(c(var.1se, "readmit_30"))
 
-fit.all <- bestglm(Xy, family = binomial, method = "exhaustive", IC="AIC", nvmax = 10) # method = "exhaustive", "forward" or "backward"
-names(fit.all) # fit.all$Subsets to list best submodels
-```
+# fit glm with LASSO-identified variables
+fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.m) # not sure if we should keep the full data or the readmit_mod without NAs? - think we should keep the NAs in
 
-
-Trying LASSO random unique-pt sample - doesn't seem to work, matrix too big?!
-
-```{r results=FALSE}
-#remove columns we don't want to include as predictors or y
-readmit_mod <- readmit_rand %>% dplyr::select(!c(encounter_id, readmitted))
-
-Y <- readmit_mod[, 28] # extract Y
-X <- model.matrix(readmit_30 ~., data=readmit_mod)[, -1]  # for each factor: num of levels -1
-set.seed(100)  # seed for reproducibility 
-fit.readmit.cv <- cv.glmnet(X, Y,  alpha=1, family="binomial", nfolds = 10, type.measure = "deviance")  
-# names(fit.readmit.cv); summary(fit.readmit.cv)
-# plot(fit.readmit.cv$lambda)
-# fit.readmit.cv$cvm               # the mean cv error for each lambda 
-# plot(fit.readmit.cv$lambda, fit.fl.cv$cvm, xlab="lambda", ylab="mean cv errors")
-# fit.readmit.cv$lambda.min # lambda.min returns the min point all the cvm. 
-# fit.readmit.cv$lambda.1se
-# fit.readmit.cv$nzero     # string of number of non-zero coeff's returned for each lambda
-```
-
-I guess just try running one at a time?!
-
-```{r}
-fit1 <- glm(readmit_30~nb_admissions, readmit_mod, family=binomial(logit))  #summary(glm(as.numeric(HD)~SBP, fram_data, family=gaussian))
-summary(fit1, results=TRUE)
+# check significance of variables
+Anova(fit.logit.1)
 ```
 
 2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
+
+We'll start by using our model built from LASSO 
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
 
