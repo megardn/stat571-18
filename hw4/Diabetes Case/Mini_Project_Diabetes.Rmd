@@ -22,7 +22,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr, bestglm)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr, bestglm, pROC)   #add your packages here
 ```
 
 
@@ -366,21 +366,77 @@ data.train.m <- data.train %>%
 Xy_design <- model.matrix(readmit_30 ~.+0, data.train.m) #+0 -> no intercept, gets rid of first col with 1s
 # Attach y as the last column.
 Xy <- data.frame(Xy_design, data.train.m$readmit_30)   
-fit.glm.1 <- bestglm(Xy, family = binomial, method = "forward", IC="AIC") #using forward selection for efficiency
-fit.glm.1$BestModels
-fit.glm.1$BestModel
+fit.glm <- bestglm(Xy, family = binomial, method = "forward", IC="AIC") #using forward selection for efficiency
+fit.glm$BestModels
+fit.glm$BestModel
 
-# check significance of predictors in BestModel
-# summary(glm(readmit_30~race+age_mod, family=binomial, data=data.train.m))
+# check significance of predictors in BestModel on data.test
+fit.glm.1 <- glm(readmit_30~race+age_mod+num_medications, family=binomial, data=data.test)
+summary(fit.glm.1)
+Anova(fit.glm.1)
 ```
 
-Interestigly, race is not significant so we can 
+Interestingly, race is not significant so we can remove it from the model.
 
-Compare bestglm and LASSO models on AUC/ROC, pick sensitivity threshold -> prediction
+``` {r bestglm model}
+fit.glm.final <- glm(readmit_30~age_mod+num_medications, family=binomial, data=data.test)
+Anova(fit.glm.final)
+summary(fit.glm.final)$dispersion
+```
+
+Now we'll compare the bestglm and LASSO models' on AUC/ROC to see which one is best for prediction. 
+
+
+```{r}
+fit.glm.final.roc <- roc(data.test$readmit_30, fit.glm.final$fitted) #bestglm model on data.test
+fit.logit.1.roc <- roc(data.train.lasso$readmit_30, fit.logit.1$fitted) #LASSO model on data.train.lasso
+plot(1-fit.glm.final.roc$specificities, 
+     fit.glm.final.roc$sensitivities, col="red", lwd=3, type="l",
+     xlab="False Positive", 
+     ylab="Sensitivity")
+lines(1-fit.logit.1.roc$specificities, fit.logit.1.roc$sensitivities, col="blue", lwd=3)
+legend("bottomright",
+       c(paste0("fit.glm.final (bestglm) AUC=", round(fit.glm.final.roc$auc,2)), 
+         paste0("fit.logit.1 (LASSO) AUC=", round(fit.logit.1.roc$auc, 2))),
+       col=c("red", "blue"),
+       lty=1)
+```
+
+The ROC curve and AUC clearly indicate that our final LASSO model is superior to the bestglm model. We'll proceed with prediction using `fit.logit.1` as our final model.
+
+To start, we'll threshold our probability of readmission at 1/2.
+
+```{r classify half}
+#run classification
+fit.pred.1 <- ifelse(fit.logit.1$fitted > 1/2, "1", "0") #y hat
+
+#set.seed(10)
+# output1 <- data.frame(data.train.lasso.m$readmit_30, fit.pred.1, fit.logit.1$fitted)[sample(57213, 15),] #set to 15 so we have at least 1 y=1
+
+#compare readmission with prediction via confusion matrix - rows = predicted values, cols = actual
+cm.1 <- table(fit.pred.1, data.train.lasso.m$readmit_30)
+cm.1
+```
+
+Setting the threshold to 0.5 gives a sensitivity of _ and specificity of _. *to do: Fine-tune based on what seems to make sense with ROC curve*
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
 
-Bayes on final model.
+Bayes' rule can be used as a classification rule to minimize the cost according to specific weights. Assuming the cost of misclassifying "1" to "0" is 2 times of that of misclassifying "0" to "1",
+then the Bayes rule is thresholding over the 
+$$\hat P(Y=1 \vert x) > \frac{0.5}{(1+0.5)}=0.333$$ 
+
+Therefore we'll use Bayes thresholding on our final model.  *run on training&testing or validation data? Both?*
+
+```{r Bayes rule}
+# Applying Bayes rule
+fit.logit.1.bayes <- as.factor(ifelse(fit.logit.1$fitted > .333, "1", "0"))
+MCE.bayes <- (2 * sum(fit.logit.1.bayes[data.train.lasso.m$readmit_30 == "1"] != "1") 
+                      + sum(fit.logit.1.bayes[data.train.lasso.m$readmit_30 == "0"] != "0"))/length(data.train.lasso.m$readmit_30)
+MCE.bayes
+```
+
+*MCE.bayes looks pretty bad... to do: check sensitivity/specificty vs our predictions from part 2 and make some kind of comment about it*
 
 Suggestion: You may use any of the methods covered so far in parts 1) and 2), and they need not be the same. Also keep in mind that a training/testing data split may be necessary. 
 
