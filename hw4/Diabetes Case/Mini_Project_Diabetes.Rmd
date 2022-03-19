@@ -133,22 +133,6 @@ To save your time we are going to use some data sets cleaned by the group. Thus,
 
 ## EDA
 
-Read `readmission.csv` as `readmit_data`
-```{r}
-readmit_data <- read.csv("readmission.csv", header=T, na.strings= c("?", "None"), stringsAsFactors = T)
-
-#recode encounter_id and patient_nbr as factor
-readmit_data <- readmit_data %>% mutate(encounter_id = as.factor(encounter_id),
-                                        patient_nbr = as.factor(patient_nbr),
-                                        readmit_30 = as.factor(ifelse(readmitted == '<30', 1, 0))) #code new response var readmission indicator - tbh not sure if this should be factor
-
-# str(readmit_data) 
-# summary(readmit_data)
-skim(readmit_data)
-```
-
-## EDA
-
 ### Numerical summary 
 
 First, we read in `readmission.csv` as `readmit_data` and provide a numerical summary:
@@ -189,26 +173,19 @@ skim(readmit_data[["nb_admissions"]])
 ```
 
 
-Remove duplicate patient IDs such that we only have the last inpatient admission for each subject. *Note: Seems to make sense to take the latest hospitalization, since it's most "up-to-date" but we could take first instead? Either way it'll probably skew whether pts are readmitted or not, or we could try to filter randomly. J: hmm I after looking at the data it seems like every row is sort of a new event (i.e., tracks readmission following that hospitalization event), so maybe it makes sense to keep them all?*
-
 ## Visual summary
 
+Because logistic regression depends on observations being independent, we subsetted by selecting only one random hospitalization for each individual patient. We will perform further EDA and further modelling on this subsetted sample.
+
 ```{r}
-#filter by unique pts's last hospitalization
-readmit_latest <- readmit_data %>% 
-  arrange(-number_inpatient) %>%
-  filter(!duplicated(patient_nbr))
-#filter by unique pts's first hospitalization
-readmit_first <- readmit_data %>% 
-  arrange(number_inpatient) %>%
-  filter(!duplicated(patient_nbr))
-#filter by unique pt's randomly
+#filter unique pt's random hospitalizations
 set.seed(100) #seed for reproducibility
-readmit_rand <- readmit_data %>% 
+readmit_uniq <- readmit_data %>% 
    group_by(patient_nbr) %>%
    sample_n(1)
 
 str(readmit_uniq)
+sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)
 
 #quick plot to see differences between readmission among all data and unique pt subset
 p1 <- ggplot(readmit_data, aes(x=readmitted)) + 
@@ -221,10 +198,10 @@ p2 <- ggplot(readmit_uniq, aes(x=readmitted)) +
   labs(title = "Readmission in Latest Hosp Subset", y="Percent")
 p3 <- ggplot(readmit_data, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission < or > 30 days in Full Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in Full Hosp Subset", y="Percent")
 p4 <- ggplot(readmit_uniq, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission < or > 30 days in Latest Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in Latest Hosp Subset", y="Percent")
 
 ggarrange(p1, p2, ncol = 2, common.legend = T)
 ggarrange(p3, p4, ncol = 2, common.legend = T)
@@ -232,33 +209,13 @@ ggarrange(p3, p4, ncol = 2, common.legend = T)
 
 We can observe that:
 * around 10% of the full sample is readmitted within 1 month
-* around 3% of the latest hospital admission is readmitted within 1 month
-
-```{r}
-#quick plot to see differences between readmission among all data and unique pt subsets
-p1 <- ggplot(readmit_data, aes(x=readmitted)) + 
-  geom_bar(aes(y = (..count..)/sum(..count..))) + 
-  ylim(0, 0.75) +
-  labs(title = "Readmission in Full Dataset", y="Percent")
-p2 <- ggplot(readmit_latest, aes(x=readmitted)) + 
-  geom_bar(aes(y = (..count..)/sum(..count..))) + 
-  ylim(0, 0.75) +
-  labs(title = "Readmission in Latest Hosp Subset", y="Percent")
-p3 <- ggplot(readmit_first, aes(x=readmitted)) + 
-  geom_bar(aes(y = (..count..)/sum(..count..))) + 
-  ylim(0, 0.75) +
-  labs(title = "Readmission in First Hosp Subset", y="Percent")
-p4 <- ggplot(readmit_rand, aes(x=readmitted)) + 
-  geom_bar(aes(y = (..count..)/sum(..count..))) + 
-  ylim(0, 0.75) +
-  labs(title = "Readmission in Random Unique Subset", y="Percent")
-
-ggarrange(p1, p2, p3, p4, ncol = 4, common.legend=T, labels = )
-```
+* around 7% of the latest hospital admission is readmitted within 1 month
 
 Further exploratory visualizations are performed to obtain an initial sense of which variables may play a role in whether patients are readmitted within 30 days or not:
 
 ```{r visualizing readmit_30 and other variables}
+
+#DO we want to do this EDA in the subset or full dataset? Maybe keep full dataset and reorder?
 
 # demographic variables - this output is quite ugly, we might want to substitute with individual plots for each demographic factor in relation to readmit_30
 # readmit_data %>% 
@@ -318,8 +275,6 @@ From the *Goals* section above, your study should respond to the following:
 
 1) Identify important factors that capture the chance of a readmission within 30 days. 
 
-The set of available predictors is not limited to the raw variables in the data set. You may engineer any factors using the data, that you think will improve your model's quality.
-
 We first split the data into `data.train`, `data.test` and `data.val`. 
 
 ```{r}
@@ -339,6 +294,35 @@ data.train <- readmit_rand[idx_train,]
 data.test <- readmit_rand[idx_test,]
 data.val <- readmit_rand[idx_val,]
 ``` 
+
+To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. The model will be built using our training dataset and validated with the validation subset.  
+
+```{r run LASSO}
+#remove columns we don't want to include as predictors or y
+readmit_mod <- readmit_rand %>% 
+  select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable - pt keeps getting added back in for me
+  na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
+
+# generate matrices for LASSO
+Y <- as.matrix(readmit_mod[, "readmit_30"]) # extract Y and transform to matrix for LASSO to work
+X <- model.matrix(readmit_30 ~., data = readmit_mod)[, -1]  # for each factor: num of levels -1
+set.seed(100)  # seed for reproducibility 
+
+# run LASSO
+fit.readmit.cv <- cv.glmnet(X, Y,  alpha = 1, family = "binomial", nfolds = 10, type.measure = "deviance")
+
+# plotting
+plot(fit.readmit.cv)
+
+fit.readmit.cv$lambda.1se # use lambda.1se to select the smaller model
+coef.1se <- coef(fit.readmit.cv, s = "lambda.1se") # get coefficients
+coef.1se <- coef.1se[which(coef.1se != 0),] # show variables with non-zero coefficients
+
+# output variable names
+coef.1se <- rownames(as.matrix(coef.1se))[-1] 
+coef.1se
+```
+
 
 Let's use bestglm to find models with the smallest AIC:
 
