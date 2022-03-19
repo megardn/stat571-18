@@ -138,7 +138,7 @@ To save your time we are going to use some data sets cleaned by the group. Thus,
 First, we read in `readmission.csv` as `readmit_data` and provide a numerical summary:
 
 ```{r}
-readmit_data <- read.csv("readmission.csv", header=T, na.strings= c("?", "None"), stringsAsFactors = T)
+readmit_data <- read.csv("readmission.csv", header=T, na.strings= c("?", "None", "Unknown/Invalid"), stringsAsFactors = T)
 
 #recode encounter_id and patient_nbr as factor
 readmit_data <- readmit_data %>% mutate(encounter_id = as.factor(encounter_id),
@@ -287,7 +287,7 @@ We first split the data into `data.train`(60%), `data.test` (20%) and `data.val`
 
 ```{r}
 # Split the data
-N <- length(readmit_rand$patient_nbr)
+N <- length(readmit_uniq$patient_nbr)
 n1 <- floor(.6*N)
 n2 <- floor(.2*N)
 
@@ -298,9 +298,9 @@ idx_train <- sample(N, n1)
 idx_no_train <- (which(! seq(1:N) %in% idx_train))
 idx_test <- sample(idx_no_train, n2)
 idx_val <- which(! idx_no_train %in% idx_test)
-data.train <- as.data.frame(readmit_rand[idx_train,])
-data.test <- as.data.frame(readmit_rand[idx_test,])
-data.val <- as.data.frame(readmit_rand[idx_val,])
+data.train <- as.data.frame(readmit_uniq[idx_train,])
+data.test <- as.data.frame(readmit_uniq[idx_test,])
+data.val <- as.data.frame(readmit_uniq[idx_val,])
 data.train.lasso <- rbind(data.train, data.test)
 ``` 
 
@@ -331,7 +331,7 @@ var.1se <- rownames(as.matrix(coef.1se))[-1] # output variable names without int
 var.1se
 ```
 
-Try running with gLASSO. If you create dummy variables encoding each factor variable, this will keep all factor levels together; seems like a lot of work circle back to this!
+Try running with gLASSO? If you create dummy variables encoding each factor variable, this will keep all factor levels together; seems like a lot of work circle back to this!
 
 
 Now we use the predictors identified to build our model on `data.train`.
@@ -340,11 +340,11 @@ Now we use the predictors identified to build our model on `data.train`.
 # let's first select the variables identified through LASSO - for now dropping factor levels and readding full variable
 var.1se <- var.1se[-grep("disch_disp_modified|age_mod", var.1se)] # remove factor levels
 var.1se <- append(var.1se, c("disch_disp_modified", "age_mod")) # replace levels with full factors
-data.train.m <- data.train %>%
+data.train.lasso.m <- data.train.lasso %>%
   select(c(var.1se, "readmit_30"))
 
 # fit glm with LASSO-identified variables
-fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.m) # not sure if we should keep the full data or the readmit_mod without NAs? - think we should keep the NAs in
+fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.lasso.m) # not sure if we should keep the full data or the readmit_mod without NAs? - think we should keep the NAs in
 
 # check significance of variables
 Anova(fit.logit.1)
@@ -359,7 +359,7 @@ We'll build another model using bestglm to test against our LASSO model. Since b
 ```{r bestglm}
 # mod data.train
 data.train.m <- data.train %>% 
-  select(c("readmit_30", "race", "gender", "age_mod")) %>% #, "num_medications", "change", "number_diagnoses" "disch_disp_modified", "adm_typ_mod", "diag1_mod"
+  select(c("readmit_30", "race", "gender", "age_mod", "num_medications")) %>% # "change", "number_diagnoses" "disch_disp_modified", "adm_typ_mod", "diag1_mod"
   na.omit() # omitting NAs (model.matrix also removes them by default)
 
 # Get the design matrix without 1's and HD
@@ -367,8 +367,14 @@ Xy_design <- model.matrix(readmit_30 ~.+0, data.train.m) #+0 -> no intercept, ge
 # Attach y as the last column.
 Xy <- data.frame(Xy_design, data.train.m$readmit_30)   
 fit.glm.1 <- bestglm(Xy, family = binomial, method = "forward", IC="AIC") #using forward selection for efficiency
-names(fit.glm.1) # fit.all$Subsets to list best submodels
+fit.glm.1$BestModels
+fit.glm.1$BestModel
+
+# check significance of predictors in BestModel
+# summary(glm(readmit_30~race+age_mod, family=binomial, data=data.train.m))
 ```
+
+Interestigly, race is not significant so we can 
 
 Compare bestglm and LASSO models on AUC/ROC, pick sensitivity threshold -> prediction
 
