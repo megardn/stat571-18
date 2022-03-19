@@ -22,7 +22,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, tidyr, bestglm)   #add your packages here
 ```
 
 
@@ -195,13 +195,13 @@ p1 <- ggplot(readmit_data, aes(x=readmitted)) +
 p2 <- ggplot(readmit_uniq, aes(x=readmitted)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmitted)) + 
   ylim(0, 0.75) +
-  labs(title = "Readmission in Latest Hosp Subset", y="Percent")
+  labs(title = "Readmission in Random Hosp Subset", y="Percent")
 p3 <- ggplot(readmit_data, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
   labs(title = "Readmission within 30 days in Full Hosp Subset", y="Percent")
 p4 <- ggplot(readmit_uniq, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission within 30 days in Latest Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in Random Hosp Subset", y="Percent")
 
 ggarrange(p1, p2, ncol = 2, common.legend = T)
 ggarrange(p3, p4, ncol = 2, common.legend = T)
@@ -256,6 +256,14 @@ readmit_data %>%
     facet_wrap(~Medication) +
     labs(title = "Readmission within 30 days by medication trends", y="Percent")
 
+# plotting change in rx
+readmit_data %>%
+  drop_na(change) %>% #drop NAs before plotting - makes sense i think?
+  ggplot(aes(x = readmit_30)) + 
+    geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
+    facet_wrap(~change) +
+    labs(title = "Readmission within 30 days by change in diabetes", y="Percent")
+
 # could do the same for the remaining factors about diabetes medication, discharge, admission
 
 # numerical variables
@@ -275,27 +283,32 @@ From the *Goals* section above, your study should respond to the following:
 
 1) Identify important factors that capture the chance of a readmission within 30 days. 
 
-We first split the data into `data.train` (70% of our data) and `data.val` (30%). 
+We first split the data into `data.train`(60%), `data.test` (20%) and `data.val` (20%). 
 
 ```{r}
 # Split the data
 N <- length(readmit_rand$patient_nbr)
-n1 <- floor(.7*N)
+n1 <- floor(.6*N)
+n2 <- floor(.2*N)
 
 set.seed(10)
-# Split data to three portions of .6, .2 and .2 of data size N
 
+# Split data to three portions of .6, .2 and .2 of data size N
 idx_train <- sample(N, n1)
-idx_val <- (which(! seq(1:N) %in% idx_train))
+idx_no_train <- (which(! seq(1:N) %in% idx_train))
+idx_test <- sample(idx_no_train, n2)
+idx_val <- which(! idx_no_train %in% idx_test)
 data.train <- as.data.frame(readmit_rand[idx_train,])
+data.test <- as.data.frame(readmit_rand[idx_test,])
 data.val <- as.data.frame(readmit_rand[idx_val,])
+data.train.lasso <- rbind(data.train, data.test)
 ``` 
 
-To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary.*NOTE - that's true right?*
+To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary, and so we'll incorporate these data points into the training dataset for this test.
 
 ```{r run LASSO}
 #remove columns we don't want to include as predictors or y
-readmit_mod <- data.train %>% 
+readmit_mod <- data.train.lasso %>% 
   select(!c(encounter_id, patient_nbr, readmitted)) %>% # removing patient and admission IDs as well as irrelevant readmitted variable
   na.omit() # omitting NAs as LASSO does not accept these (and model.matrix also removes them by default)
 
@@ -323,7 +336,7 @@ Try running with gLASSO. If you create dummy variables encoding each factor vari
 
 Now we use the predictors identified to build our model on `data.train`.
 
-```{r results=TRUE}
+```{r LASSO model}
 # let's first select the variables identified through LASSO - for now dropping factor levels and readding full variable
 var.1se <- var.1se[-grep("disch_disp_modified|age_mod", var.1se)] # remove factor levels
 var.1se <- append(var.1se, c("disch_disp_modified", "age_mod")) # replace levels with full factors
@@ -337,11 +350,31 @@ fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.m) # not
 Anova(fit.logit.1)
 ```
 
+All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. This makes sense because ...
+
 2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
 
-We'll start by using our model built from LASSO 
+We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge: *note - originally used LASSO outputs as starting point but then the model was super small and very redundant*
+
+```{r bestglm}
+# mod data.train
+data.train.m <- data.train %>% 
+  select(c("readmit_30", "race", "gender", "age_mod")) %>% #, "num_medications", "change", "number_diagnoses" "disch_disp_modified", "adm_typ_mod", "diag1_mod"
+  na.omit() # omitting NAs (model.matrix also removes them by default)
+
+# Get the design matrix without 1's and HD
+Xy_design <- model.matrix(readmit_30 ~.+0, data.train.m) #+0 -> no intercept, gets rid of first col with 1s
+# Attach y as the last column.
+Xy <- data.frame(Xy_design, data.train.m$readmit_30)   
+fit.glm.1 <- bestglm(Xy, family = binomial, method = "forward", IC="AIC") #using forward selection for efficiency
+names(fit.glm.1) # fit.all$Subsets to list best submodels
+```
+
+Compare bestglm and LASSO models on AUC/ROC, pick sensitivity threshold -> prediction
 
 3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
+
+Bayes on final model.
 
 Suggestion: You may use any of the methods covered so far in parts 1) and 2), and they need not be the same. Also keep in mind that a training/testing data split may be necessary. 
 
@@ -349,7 +382,7 @@ Suggestion: You may use any of the methods covered so far in parts 1) and 2), an
 
 - Use training/testing data to land a final model (If you only use LASSO to land a final model, we will not need testing data since all the decisions are made with cross-validations.)
 
-- Evaluate the final model with the validation data to give an honest assessment of your final model. 
+- *Evaluate the final model with the validation data to give an honest assessment of your final model*. 
 
 # The write up
 
