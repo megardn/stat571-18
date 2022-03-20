@@ -199,6 +199,81 @@ Results indicate that the following factors increase the risk of readmission wit
 
 More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location strongly influences the type of recuperative care that patients receive post-hospitalization, which in turn impacts the risk of readmission. 
 
+```{r plotting main findings}
+
+# plotting age bins
+p_age <- readmit_uniq %>%
+  mutate(readmit_30 = as.factor(readmit_30)) %>% 
+  mutate(readmit_30 = recode_factor(readmit_30, "0" = "No", "1" = "Yes")) %>%
+  ggplot(aes(x = age_mod, fill = readmit_30)) + 
+    geom_bar(aes(y = (..count..)/sum(..count..)), position = "dodge") + 
+    labs(title = "Readmission within 30 days by age bins", y="Percent")
+
+df2%>%mutate(Grade=recode(Grade,A="Excellent",B="Very Good",C="Good",D="Bad",E="Very Bad"))
+
+# plotting discharge location
+p_disch <- readmit_uniq %>%
+  drop_na(disch_disp_modified) %>% #drop NAs before plotting 
+  mutate(readmit_30 = as.factor(readmit_30)) %>% 
+  mutate(readmit_30 = recode_factor(readmit_30, "0" = "No", "1" = "Yes"),
+         disch_disp_modified = recode_factor(disch_disp_modified, "Discharged to home" = "Home", 
+                                             "Discharged to home with Home Health Service" = "Home Health Service",
+                                             "Discharged/Transferred to SNF" = "Skilled Nursing Facility",
+                                             "Other" = "Other")) %>%
+  ggplot(aes(x = disch_disp_modified, fill = readmit_30)) + 
+    geom_bar(aes(y = (..count..)/sum(..count..)), position = "dodge") + 
+    labs(title = "Readmission within 30 days by discharge location", y="Percent")
+
+# plotting number of inpatient visits
+p_inpatient <- readmit_uniq %>%
+  drop_na(number_inpatient) %>% #drop NAs before plotting 
+  mutate(readmit_30 = as.factor(readmit_30)) %>% 
+  mutate(readmit_30 = recode_factor(readmit_30, "0" = "No", "1" = "Yes")) %>%
+  ggplot(aes(x = readmit_30, y = number_inpatient, fill = readmit_30, color = readmit_30)) + 
+    geom_boxplot() + 
+    labs(title = "Readmission within 30 days by number of inpatient visits in the previous year", 
+         y = "Number of inpatient visits in the previous year")
+
+# outputting plots
+ggarrange(p_age, p_inpatient, p_disch, ncol = 2, nrow = 2, common.legend = T)
+
+
+# trying to plot the predicted probability for each predictor variable based on our LASSO model... Only works partially for now
+# get predicted probability of readmission at each value of age, holding inpatient visits and discharge location constant
+age_pred <- with(readmit_uniq, data.frame(number_inpatient = mean(number_inpatient), 
+                                          disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
+                                          age_mod = factor(levels(readmit_uniq$age_mod))
+                                          ))
+
+age_pred$age_prob <- predict(fit.logit.1, newdata = age_pred, type = "response")
+
+# plotting
+p_pred_age <- ggplot(age_pred, aes(x = age_mod, y = age_prob)) + 
+  geom_line(aes(group = 1), color = "grey") +
+  geom_point(color = "seagreen4", size = 5) +
+  ggtitle("Predicted probability of readmission within 30 days by age groups") 
+
+## get predicted probability of readmission at each value of inpatient visits, holding age and discharge location constant
+# create new df
+inpatient_pred <- with(readmit_uniq, data.frame(number_inpatient = rep(seq(from = 0, to = 15, length.out = 100), 4), # get 110 data points to get
+                                                                                                                    # smoother lines repeated 4x
+                                                                                                                    # as 4 age bins/discharge levels
+                                    disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
+                                    age_mod = factor(levels(readmit_uniq$age_mod))
+                                    ))
+
+inpatient_pred$inpatient_prob <- predict(fit.logit.1, newdata = inpatient_pred, type = "response")
+
+# plotting
+p_pred_inpatient <- ggplot(inpatient_pred, aes(x = number_inpatient, y = inpatient_prob)) +
+  geom_smooth(color = "seagreen4") +
+  ggtitle("Predicted probability of readmission within 30 days by number of inpatient visits in the previous year")
+
+ggarrange(p_pred_age, p_pred_inpatient, ncol = 2, common.legend = T) # nrow = 2,
+
+# haven't managed to make it work for discharge location yet, something weird about the way predicted values are outputted...
+
+```
 
 
 ## Limitations and conclusion
@@ -313,7 +388,7 @@ readmit_uniq %>%
 
 # plotting race
 readmit_uniq %>%
-  drop_na(race) %>% #drop NAs before plotting - makes sense i think?
+  drop_na(race) %>% #drop NAs before plotting 
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~race) +
@@ -332,19 +407,19 @@ readmit_uniq %>%
 
 # plotting change in rx
 readmit_uniq %>%
-  drop_na(change) %>% #drop NAs before plotting - makes sense i think?
+  drop_na(change) %>% #drop NAs before plotting 
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~change) +
     labs(title = "Readmission within 30 days by change in diabetes", y="Percent")
 
-# plotting change in rx
+# plotting discharge location
 readmit_uniq %>%
-  drop_na(disch_disp_modified) %>% #drop NAs before plotting - makes sense i think?
+  drop_na(disch_disp_modified) %>% #drop NAs before plotting 
   ggplot(aes(x = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
     facet_wrap(~disch_disp_modified) +
-    labs(title = "Discharge location within 30 days by change in diabetes", y="Percent")
+    labs(title = "Readmission within 30 days by discharge location", y="Percent")
 
 # could do the same for the remaining factors about diabetes medication, discharge, admission
 
