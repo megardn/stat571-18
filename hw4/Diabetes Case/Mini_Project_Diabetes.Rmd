@@ -12,7 +12,7 @@ output:
     toc: yes
     toc_depth: '4'
   html_document:
-    code_folding: show
+    code_folding: hide
     highlight: haddock
     theme: lumen
     toc: yes
@@ -156,14 +156,50 @@ A suggested outline of the report would include the following components:
 
 ## Background
 
-In the U.S., diabetes is a chronic condition characterized by high blood sugar, leading to important health concerns. Diabetes is a major health care concern, as over 35 million (or 1 in 10) people are affected by this condition in the U.S. alone [CDC](https://www.cdc.gov/chronicdisease/programs-impact/pop/diabetes.htm). It also represents the nation's most expensive chronic condition, with over 237 billion dollars being spent annually on care for individuals with diabetes. Importantly, if diabetes is not detected/managed poorly, this can lead to serious health conditions and may cause the patient to undergo repeated hospital admissions, which in turn involves substantial costs. In addition, insurances no longer reimburse hospitals when patients are readmitted within 30 days, creating a strong incentive for hospitals to improve initial admission care and understand which factors may increase the risk of readmission within 30 days. In this study, we address this question using a public open dataset containing data collected from 70,000 patients with a total of 100,000 admissions over a period of 10 years (1999-2008) in 130 states, provided by the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University. 
+**Problem:** In the U.S., diabetes is a chronic condition characterized by high blood sugar, leading to important health concerns. Diabetes is a major health care concern, as over 35 million (or 1 in 10) people are affected by this condition in the U.S. alone [CDC](https://www.cdc.gov/chronicdisease/programs-impact/pop/diabetes.htm). It also represents the nation's most expensive chronic condition, with over 237 billion dollars being spent annually on care for individuals with diabetes. Importantly, if diabetes is not detected/managed poorly, this can lead to serious health conditions and may cause the patient to undergo repeated hospital admissions, which in turn involves substantial costs. In addition, insurances no longer reimburse hospitals when patients are readmitted within 30 days, creating a strong incentive for hospitals to improve initial admission care and understand which factors may increase the risk of readmission within 30 days. 
 
-The goal of this study is to determine which factors significantly impact the risk of readmission within 30 days. To address this goal, we use two different methods, LASSO regression and AIC, to identify the most important risk factors for readmission within 30 days. We then provide a brief summary and visualization of findings, and finally will provide general conclusions and recommendations to improve care for diabetes and avoid short-interval readmission.
+**Solution:** The goal of this study is to determine which factors significantly impact the risk of readmission within 30 days. We address this question using a public open dataset containing data collected from 70,000 patients with a total of 100,000 admissions over a period of 10 years (1999-2008) in 130 states, provided by the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University. In what follow, we provide a brief summary of the data and an overview of the main findings. Finally, general conclusions and recommendations are made to improve care for diabetes and avoid short-term readmission.
 
 
 ## Brief data summary
+  
+  
+Overall, around `r round(sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)*100, 0)`% of patients admitted to a hospital had to be readmitted within 30 days. This indicates suboptimal care during the first admission event, leading to poorer health outcomes and increasing the risk of repeated hospitalizations. This also represents a heavy financial burden for hospitals, given that healthcare for these 7% of patients is not reimbursed by insurances. 
 
-## Methods and main findings
+```{r load workspace}
+
+# loading workspace containing all relevant R objects for faster knitting of executive summary
+load("Mini_Project_Diabetes.RData")
+
+```
+
+```{r plotting exec summary}
+# bar plot showing readmit_30 proportions
+ggplot(readmit_uniq, aes(x = readmit_30)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
+  labs(title = "Readmission within 30 days", y="Percent")
+
+```
+  
+
+## Method
+
+Analyses were conducted using a method that identifies the most important factors in determining whether a patient will be readmitted within 30 days or not. The identified factors can either be: 
+
+* Risk factors: when a patient presents with such a factor, their risk of readmission increases. 
+* Protective factors: this type of factor reduces a patient's risk of readmission. 
+
+## Main findings
+
+Results indicate that the following factors increase the risk of readmission within 30 days:
+
+* **Number of inpatient visits**: an individual with more inpatient visits during the year prior to the admission event has a higher risk of readmission within 30 days. 
+* **Discharge location**: the location of patient discharge influences the type of recuperative care received post-hospitalization
+* **Age**: older individuals are more likely to require a short-term readmission. 
+
+More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location strongly influences the type of recuperative care that patients receive post-hospitalization, which in turn impacts the risk of readmission. 
+
+
 
 ## Limitations and conclusion
 
@@ -539,6 +575,14 @@ MCE.val <- (2 * sum(fit.logit.bayes.f[data.val$readmit_30 == "1"] != "1")
                       + sum(fit.logit.bayes.f[data.val$readmit_30 == "0"] != "0"))/length(data.val$readmit_30)
 MCE.val
 ```
+
+```{r save workspace}
+
+# saving workspace containing all generated objects for faster knitting of executive summary above
+save.image("Mini_Project_Diabetes.RData")
+
+```
+
 
 # Conclusion
 
