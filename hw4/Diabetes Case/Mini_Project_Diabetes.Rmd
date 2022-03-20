@@ -194,10 +194,10 @@ Analyses were conducted using a method that identifies the most important factor
 Results indicate that the following factors increase the risk of readmission within 30 days:
 
 * **Number of inpatient visits**: an individual with more inpatient visits during the year prior to the admission event has a higher risk of readmission within 30 days. 
-* **Discharge location**: the location of patient discharge influences the type of recuperative care received post-hospitalization
+* **Discharge location**: patients discharged at specialized care facilities are at higher risk of short-term readmission.
 * **Age**: older individuals are more likely to require a short-term readmission. 
 
-More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location strongly influences the type of recuperative care that patients receive post-hospitalization, which in turn impacts the risk of readmission. 
+More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location is an indirect indication of disease severity, where patients with poorer health conditions tend to be discharged are specialized care facilities. Given their generally poorer health state, these patients have an increased risk of short-term readmission. 
 
 ```{r plotting main findings}
 
@@ -290,6 +290,8 @@ ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common
 
 
 ```
+
+
 
 
 ## Limitations and conclusion
