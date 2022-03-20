@@ -31,8 +31,6 @@ pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, skimr, GGally, ggpubr, t
 ```
 
 
-
-
 # Instructions
 
 * This is a project. Well organized and well presented write-up is one major motivation here. Please see the section on `Write up` for details. 
@@ -52,107 +50,14 @@ Given these policy changes, being able to identify and predict those patients mo
 
 In this project, we shall explore how to use the techniques we have learned in order to help better manage diabetes patients who have been admitted to a hospital. Our goal is to avoid patients being readmitted within 30 days of discharge, which reduces costs for the hospital and improves outcomes for patients. If we could identify important factors relating to the chance of a patient being readmitted within 30 days of discharge, effective intervention could be done to reduce the chance of being readmitted. Also if we could predict one's chance being readmitted well, actions can be taken. 
 
-## The data
-
-The original data is from the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University. It covers data on diabetes patients across 130 U.S. hospitals from 1999 to 2008. There are over 100,000 unique hospital admissions in this dataset, from ~70,000 unique patients. The data includes demographic elements, such as age, gender, and race, as well as clinical attributes such as tests conducted, emergency/inpatient visits, etc. Refer to the original documentation for more details on the dataset. Three former students Spencer Luster, Matthew Lesser and Mridul Ganesh, brought this data set into the class and did a wonderful final project. We will use a subset processed by the group but with a somewhat different objective.
-
-Data needed (see detailed information below): 
-
-- **`diabetic.data.csv`**
-- **`readmission.csv`**
-
-### Characteristics of the Data Set
-
-All observations have five things in common:
-
-1.	They are all hospital admissions
-2.	Each patient had some form of diabetes
-3.	The patient stayed for between 1 and 14 days.
-4.	The patient had laboratory tests performed on him/her.
-5.	The patient was given some form of medication during the visit.
-
-The data was collected during a ten-year period from 1999 to 2008. There are over 100,000 unique hospital admissions in the data set, with ~70,000 unique patients. 
-
-### Description of variables
-
-The dataset used covers ~50 different variables to describe every hospital diabetes admission. In this section we give an overview and brief description of the variables in this dataset.
-
-**1) Patient identifiers:** 
-
-a. `encounter_id`: unique identifier for each admission 
-b. `patient_nbr`: unique identifier for each patient *Note: potentially non-independent observations, maybe should restrict to one admission per patient?*
-
-**2) Patient Demographics:** 
-
-`race`, `age`, `gender`, `weight` cover the basic demographic information associated with each patient. `Payer_code` is an additional variable that identifies which health insurance (Medicare /Medicaid / Commercial) the patient holds.
-
-**3) Admission and discharge details:** 
-
-a.	`admission_source_id` and `admission_type_id` identify who referred the patient to the hospital (e.g. physician vs. emergency dept.) and what type of admission this was (Emergency vs. Elective vs. Urgent). 
-b.	`discharge_disposition_id` indicates where the patient was discharged to after treatment.
-
-**4) Patient Medical History:**
-
-a.	`num_outpatient`: number of outpatient visits by the patient in the year prior to the current encounter
-b.	`num_inpatient`: number of inpatient visits by the patient in the year prior to the current encounter
-c.	`num_emergency`: number of emergency visits by the patient in the year prior to the current encounter
-
-**5)	Patient admission details:**
-
-a.	`medical_specialty`: the specialty of the physician admitting the patient
-b.	`diag_1`, `diag_2`, `diag_3`: ICD9 codes for the primary, secondary and tertiary diagnoses of the patient.  ICD9 are the universal codes that all physicians use to record diagnoses. There are various easy to use tools to lock up what individual codes mean (Wikipedia is pretty decent on its own)
-c.	`time_in_hospital`: the patient’s length of stay in the hospital (in days)
-d.	`number_diagnoses`: Total no. of diagnosis entered for the patient
-e.	`num_lab_procedures`: No. of lab procedures performed in the current encounter
-f.	`num_procedures`: No. of non-lab procedures performed in the current encounter
-g.	`num_medications`: No. of distinct medications prescribed in the current encounter
-
-**6)	Clinical Results:**
-
-a.	`max_glu_serum`: indicates results of the glucose serum test
-b.	`A1Cresult`: indicates results of the A1c test
-
-**7)	Medication Details:**
-
-a.	`diabetesMed`: indicates if any diabetes medication was prescribed 
-b.	`change`: indicates if there was a change in diabetes medication
-c.	`24 medication variables`: indicate whether the dosage of the medicines was changed in any manner during the encounter
-
-**8)	Readmission indicator:** 
-
-Indicates whether a patient was readmitted after a particular admission. There are 3 levels for this variable: "NO" = no readmission, "< 30" = readmission within 30 days and "> 30" = readmission after more than 30 days. The 30 day distinction is of practical importance to hospitals because federal regulations penalize hospitals for an excessive proportion of such readmissions.
-
-To save your time we are going to use some data sets cleaned by the group. Thus, we provide two datasets:
-
-**`diabetic.data.csv`** is the original data. You may use it for the purpose of summary if you wish. You will see that the original data can’t be used directly for your analysis, yet. *Note: we should probably just skip ahead to using readmission.csv instead of trying to fuss with both?*
-
-**`readmission.csv`** is a cleaned version and they are modified in the following ways:
-
-1) `Payer code`, `weight` and `Medical Specialty` are not included since they have a large number of missing values. 
-
-2) Variables such as `acetohexamide`, `glimepiride.pioglitazone`, `metformin.rosiglitazone`, `metformin.pioglitazone` have little variability, and are as such excluded. This also includes the following variables: `chlorpropamide`, `acetohexamide`, `tolbutamide`, `acarbose`, `miglitor`, `troglitazone`, `tolazamide`, `examide`, `citoglipton`, `glyburide.metformin`, `glipizide.metformin`, and `glimepiride.pioglitazone`.
-
-3) Some categorical variables have been regrouped. For example, `Diag1_mod` keeps some original levels with large number of patients and aggregates other patients as `others`. This process is known as 'binning.'
-		
-4) The event of interest is **readmitted within < 30 days**. Note that you need to create this response first by regrouping **Readmission indicator**!
-
-
 As you all know, it is very important to present your findings well. To achieve the best possible results you need to understand your audience. 
 
 Your target audience is a manager within the hospital organization. They hold an MBA, are familiar with medical terminology (though you do not need any previous medical knowledge), and have gone through a similar course to our Modern Data Mining with someone like your professor. You can assume thus some level of technical familiarity, but should not let the paper be bogged down with code or other difficult to understand output.
 
 Note then that the most important elements of your report are the clarity of your analysis and the quality of your proposals. 
 
-A suggested outline of the report would include the following components: 
 
 # Executive Summary
-
-* This section should be accessible by people with very little statistical background (avoid using technical words and no direct R output is allowed)
-* Give a background of the study. You may check the original website or other sources to fill in some details, such as to why the questions we address here are important. 
-* A quick summary about the data.
-* Methods used and the main findings.
-* You may use clearly labelled and explained visualizations.
-* Issues, concerns, limitations of the conclusions. This is an especially important section to be honest in - we might be Penn students, but we are statisticians today.
 
 ## Background
 
@@ -163,6 +68,7 @@ A suggested outline of the report would include the following components:
 
 ## Brief data summary
   
+To investigate factors associated with readmission within 30 days, we analyzed data from ### unique patients' diabetes-related hospitalizations occurring between 1999 and 2008.Our dataset included: basic demographic information about the patients, such as age, gender and race; information about the hospitalization, such as what level of care they were admitted to and how long the were hospitalized for; counts of hospitalizations from the previous year; results from blood tests; changes in medications; and diagnoses.
   
 Overall, around `r round(sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)*100, 0)`% of patients admitted to a hospital had to be readmitted within 30 days. This indicates suboptimal care during the first admission event, leading to poorer health outcomes and increasing the risk of repeated hospitalizations. This also represents a heavy financial burden for hospitals, given that healthcare for these 7% of patients is not reimbursed by insurances. 
 
@@ -296,22 +202,22 @@ ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common
 
 ## Limitations and conclusion
 
+Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. The fact that discharge to home appears to be protective of readmission may reflect the relative lack of disease severity in these patients, but may also provide an interesting avenue of further research to explore what type of post-discharge supports prevent readmission.
 
+One important limitation of our study is the predictive ability of our model itself; while it predicted readmission well in the training dataset it was built on, prediction error was higher in an independent validation sample. Other limitations of our study include lack of predictors that were either not captured in the study, such as medical insurance information and patients' socioeconomic status, or not useable due to incompleteness, such as blood tests. Furthermore, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states, potentially limiting generalizability.
 
 # Detailed process of the analysis
 
 ## Data Summary /EDA
 
-* Nature of the data, origin
-* Necessary quantitative and graphical summaries
-* Are there any problems with the data?
-* Which variables are considered as input 
+These data were collected by the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University from 130 hospitals between 1999 and 2008. A detailed description of each variable and the initial data cleaning, undertaken by course instructors, is provided in the Appendix below. 
 
 ### Numerical summary 
 
-First, we read in `readmission.csv` as `readmit_data` and provide a numerical summary:
+After initial cleaning, our dataset contained the following:
 
-```{r}
+```{r num.eda}
+#read in `readmission.csv` as `readmit_data`
 readmit_data <- read.csv("readmission.csv", header=T, na.strings= c("?", "None", "Unknown/Invalid"), stringsAsFactors = T)
 
 #recode encounter_id and patient_nbr as factor
@@ -324,7 +230,7 @@ readmit_data <- readmit_data %>% mutate(encounter_id = as.factor(encounter_id),
 skim(readmit_data)
 ```
 
- Note that the `A1Cresult` and `max_glu_serum` variables are dropped since there the majority of rows contain missing values (0.05% and 0.1% non-NA values in `max_glu_serum` and `A1Cresult`, respectively).
+We removed the `A1Cresult` and `max_glu_serum` variables since there the majority of rows contain missing values (0.05% and 0.1% non-NA values in `max_glu_serum` and `A1Cresult`, respectively). Few other variables seem to be missing from our dataset.
  
 ```{r}
 # dropping variables with mostly NAs
@@ -332,7 +238,7 @@ readmit_data <- readmit_data %>%
   select(-c(A1Cresult, max_glu_serum))
 ```
 
-We are also adding a variable encoding the cumulative number of admissions per patient (`nb_admissions`). 
+We are also adding a variable encoding the cumulative number of admissions per patient (`nb_admissions`). While this variable cannot include hospitalizations that were not captured by the team, either because they were outside of the 130 hospitals sampled or prior to 1999, this will provide an longer overview of a particular patients' health leading up to the admission than the 1-year snapshots collected in the original dataset.
 
 ```{r}
 readmit_data <- readmit_data %>%
@@ -453,18 +359,10 @@ Based on the above plots, readmissions within 30 days may potentially occur more
 	
 ## Analyses
 
-* Various appropriate statistical methods: e.g. glmnet 
-* Comparisons various models
-* Final model(s)
-
-From the *Goals* section above, your study should respond to the following:
-
-1) Identify important factors that capture the chance of a readmission within 30 days. 
-
-We first split the data into `data.train`(60%), `data.test` (20%) and `data.val` (20%). 
+1) First we sought to identify important factors that capture the chance of a readmission within 30 days by creating a model that would describe our dataset. To do so, we subdivided our dataset into `data.train`(60%), `data.test` (20%), and `data.val` (20%), for the most rigorous model evaluation.
 
 ```{r}
-# Split the data
+# Split the data 
 N <- length(readmit_uniq$patient_nbr)
 n1 <- floor(.6*N)
 n2 <- floor(.2*N)
@@ -481,7 +379,7 @@ data.test <- as.data.frame(readmit_uniq[idx_test,])
 data.val <- as.data.frame(readmit_uniq[idx_val,])
 ``` 
 
-To determine which factors play a role in patient readmission < 30 days, we use a group `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary, and so we'll incorporate these data points into the training dataset for this test.
+To determine which factors play a role in patient readmission < 30 days, we use a `LASSO` approach (`cv.glmnet()`) where the deviance is minimized. Note that rows with NAs are omitted in this process given that the LASSO function does not tolerate these. We will use the training dataset to build the model and the validation subset to evaluate our final model. Because we are using LASSO to select our predictors, a testing dataset will not be necessary, and so we'll incorporate these data points into the training dataset for this test.
 
 ```{r run LASSO}
 #remove columns we don't want to include as predictors or y
@@ -519,7 +417,7 @@ data.train.lasso.m <- data.train.lasso %>%
   select(c(var.1se, "readmit_30"))
 
 # fit glm with LASSO-identified variables
-fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.lasso.m) # not sure if we should keep the full data or the readmit_mod without NAs? - think we should keep the NAs in
+fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.lasso.m)
 
 # check significance of variables
 Anova(fit.logit.1)
@@ -527,8 +425,6 @@ summary(fit.logit.1)
 ```
 
 All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. Each predictor identified also makes sense logically: increased age would be correlated with disease severity and the ability to recover from acute diabetes complications; the  number of inpatient hospitalizations in the previous year would also correlate with overall health status and disease severity; and the discharge location would strongly influence the type of recuperative care that patients receive post-hospitalization, which could prevent readmission. 
-
-2) For the purpose of classification, propose a model that can be used to predict whether a patient will be a readmit within 30 days. Justify your choice. Hint: use a decision criterion, such as AUC, to choose among a few candidate models.
 
 We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge. `Race` and `age_mod` were included due to the observed potential associations of Race=Caucasian and age_mod=60-70 yrs, respectively,  with readmission in our EDA; `gender` was included as part of biomedical convention, as sex differences have been observed in many diseases and can have large consequences for public health; and `num_medications` was chosen as a proxy for disease severity, as patients requiring more medications during hospitalization likely suffer a more severe or complex form of disease and may be more likely to relapse.
 
@@ -560,7 +456,8 @@ Anova(fit.glm.final)
 summary(fit.glm.final)$dispersion
 ```
 
-Now we'll compare the bestglm and LASSO models' on AUC/ROC to see which one is best for prediction.
+
+2) Now we'll compare the bestglm and LASSO models' on AUC/ROC to see which one is best for predicting whether a patient will be a readmit within 30 days. 
 
 ```{r model.comp}
 #plot ROC & AUC
@@ -622,7 +519,7 @@ confusionMatrix(data = as.factor(fit.pred.3),         # predicted value
                        positive = levels(data.train.lasso.m$readmit_30)[2])    # readmission level
 ```
 
-3) Based on a quick and somewhat arbitrary guess, we estimate **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission. Based on this risk ratio, propose a specific classification rule to minimize the cost. If you find any information that could provide a better cost estimate, please justify it in your write-up and use the better estimate in your answer.
+3) Provided estimates indicate that **it costs twice as much** to mislabel a readmission than it does to mislabel a non-readmission; therefore we propose a specific classification rule to minimize the cost.
 
 Bayes' rule can be used as a classification rule to minimize the cost according to specific weights. Assuming the cost of misclassifying "1" to "0" is 2 times of that of misclassifying "0" to "1",
 then the Bayes rule is thresholding over the 
@@ -646,17 +543,9 @@ confusionMatrix(data = as.factor(fit.logit.1.bayes),         # predicted value
                        positive = levels(data.train.lasso.m$readmit_30)[2])    # readmission level
 ```
 
-The predictions returned via our Bayes rule threshold have much lower sensitivity (0.02 vs 0.60) but also much higher specificity (0.99 vs 0.63) than our 60% specificity model. This 
+The predictions returned via our Bayes rule threshold have much lower sensitivity (0.02 vs 0.60) but also much higher specificity (0.99 vs 0.63) than our 60% specificity model.
 
-Suggestion: You may use any of the methods covered so far in parts 1) and 2), and they need not be the same. Also keep in mind that a training/testing data split may be necessary. 
-
-4) We suggest you to split the data first to Training/Testing/Validation data:
-
-- Use training/testing data to land a final model (If you only use LASSO to land a final model, we will not need testing data since all the decisions are made with cross-validations.)
-
-- *Evaluate the final model with the validation data to give an honest assessment of your final model*.
-
-To create a final evaluation of our model, we will calculate AUC and MCE on our `data.val` subset. We will threshold our data at 0.333 per our Bayes rule.
+4) Finally, we evaluate our final model with the validation data to give an honest assessment of its predictive ability. To do so, we will calculate AUC and MCE on our `data.val` subset and threshold our classification at 33.3% risk, per Bayes rule.
 
 
 ```{r validation}
@@ -677,14 +566,56 @@ save.image("Mini_Project_Diabetes.RData")
 
 ```
 
+Our model fits the validation data similarly to the training data with AUC=0.648. However, our MCE is higher (0.498), indicating our model is more likely to misclassify individuals in the validation dataset than the training dataset. 
 
 # Conclusion
 
-* Summarize results and the final model
-* Final recommendations
+Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. 
 
-Maintain a good descriptive flow in the text of your report. Use Appendices to display lengthy output. 
+In particular, our model indicates that patients who are readmitted to inpatient care are most likely to require readmission within 30 days. This could be an indication of greater disease severity in these individuals, requiring frequent hospitalization, but could also be influenced by the ability of patients to manage their disease outside the hospital. As a chronic condition, diabetes requires vigalent symptom management on the part of patients. One could imagine that patients who do not have access to regular blood-glucose testing or healthy food options may struggle to keep symptoms under control, leading to readmission. Similarly, access to stable and regular outpatient care could support patients in managing their symptoms and provide monitoring from providers who could intervene before a patient would require hospitalization. While one may argue that this is counter to our finding that discharge to home is protective against readmission, there are several possible explanations. Firstly, patients with less severe disease are more likely likely to be discharged home than more critically ill patients, reducing the overall incidence of readmission in home-discharged individuals. Furthermore, our data does not capture any of the benefits that individuals discharged to home may have, including outpatient provider access or strong family supports. Future studies could explore this possibility by surveying patient attitudes towards and knowledge about diabetes management, access to necessary medical supplies and nutrition options, and support of family and medical providers.
+
+One important limitation of our study is the predictive ability of our model itself; while it had a low misclassification error rate (MCE) in the training dataset (`r MCE.bayes`) , the MCE was higher in our validation sample (`r MCE.val`). While some discrepancy is expected given the expected variability of individuals between datasets, this does limit the strength of our model and recommendations. 
+
+Other limitations of our study include missing data points, particularly among biological measures such as serum glucose and HbA1c, which could provide direct and unbiased assessments of patients' diabetes severity. HbA1c in particular is indicative of blood glucose levels over several months and could provide important insight into the health status of individuals at readmission. Other potentially important predictors include medical insurance information and patients' socioeconomic status, which unfortunately can have strong determinations in a patients' access to care and therefore can potentially predict health status. Finally, while the dataset is large, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states. Therefore, these results could be disproportionately influenced by the healthcare environment of the Northeast (including treatment norms, insurance standards, or state law) and should be generalized with caution. 
 
 # Appendix
 	
-* Any thing necessary to keep but for which you don’t want them to be in the main report.
+### Initial Data Cleaning and Description of Variables
+
+The following descriptions were provided by the course instructors, who also undertook initial data cleaning. Three former students Spencer Luster, Matthew Lesser and Mridul Ganesh, identified the original dataset, which includes the following variables:
+
+**1) Patient identifiers:** 
+a. `encounter_id`: unique identifier for each admission 
+b. `patient_nbr`: unique identifier for each patient 
+**2) Patient Demographics:** 
+`race`, `age`, `gender`, `weight` cover the basic demographic information associated with each patient. `Payer_code` is an additional variable that identifies which health insurance (Medicare /Medicaid / Commercial) the patient holds.
+**3) Admission and discharge details:** 
+a.	`admission_source_id` and `admission_type_id` identify who referred the patient to the hospital (e.g. physician vs. emergency dept.) and what type of admission this was (Emergency vs. Elective vs. Urgent). 
+b.	`discharge_disposition_id` indicates where the patient was discharged to after treatment.
+**4) Patient Medical History:**
+a.	`num_outpatient`: number of outpatient visits by the patient in the year prior to the current encounter
+b.	`num_inpatient`: number of inpatient visits by the patient in the year prior to the current encounter
+c.	`num_emergency`: number of emergency visits by the patient in the year prior to the current encounter
+**5)	Patient admission details:**
+a.	`medical_specialty`: the specialty of the physician admitting the patient
+b.	`diag_1`, `diag_2`, `diag_3`: ICD9 codes for the primary, secondary and tertiary diagnoses of the patient.  ICD9 are the universal codes that all physicians use to record diagnoses. There are various easy to use tools to lock up what individual codes mean (Wikipedia is pretty decent on its own)
+c.	`time_in_hospital`: the patient’s length of stay in the hospital (in days)
+d.	`number_diagnoses`: Total no. of diagnosis entered for the patient
+e.	`num_lab_procedures`: No. of lab procedures performed in the current encounter
+f.	`num_procedures`: No. of non-lab procedures performed in the current encounter
+g.	`num_medications`: No. of distinct medications prescribed in the current encounter
+**6)	Clinical Results:**
+a.	`max_glu_serum`: indicates results of the glucose serum test
+b.	`A1Cresult`: indicates results of the A1c test
+**7)	Medication Details:**
+a.	`diabetesMed`: indicates if any diabetes medication was prescribed 
+b.	`change`: indicates if there was a change in diabetes medication
+c.	`24 medication variables`: indicate whether the dosage of the medicines was changed in any manner during the encounter
+**8)	Readmission indicator:** 
+Indicates whether a patient was readmitted after a particular admission. There are 3 levels for this variable: "NO" = no readmission, "< 30" = readmission within 30 days and "> 30" = readmission after more than 30 days.
+
+The course instructors completed the first level of data cleaning, as described below:
+
+1) `Payer code`, `weight` and `Medical Specialty` were removed since they have a large number of missing values. 
+2) Variables such as `acetohexamide`, `glimepiride.pioglitazone`, `metformin.rosiglitazone`, `metformin.pioglitazone` had little variability, and are as such excluded. This also includes the following variables: `chlorpropamide`, `acetohexamide`, `tolbutamide`, `acarbose`, `miglitor`, `troglitazone`, `tolazamide`, `examide`, `citoglipton`, `glyburide.metformin`, `glipizide.metformin`, and `glimepiride.pioglitazone`.
+3) Some categorical variables were binned For example, `Diag1_mod` keeps some original levels with large number of patients and aggregates other patients as `others`.
