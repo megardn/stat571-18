@@ -236,10 +236,10 @@ p_inpatient <- readmit_uniq %>%
 ggarrange(p_age, p_inpatient, p_disch, ncol = 2, nrow = 2, common.legend = T)
 
 
-# trying to plot the predicted probability for each predictor variable based on our LASSO model... Only works partially for now
 # get predicted probability of readmission at each value of age, holding inpatient visits and discharge location constant
 age_pred <- with(readmit_uniq, data.frame(number_inpatient = mean(number_inpatient), 
-                                          disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
+                                          disch_disp_modified = levels(readmit_uniq$disch_disp_modified)[1],# keeping disch "constant"
+                                                                                                            # (at reference level)
                                           age_mod = factor(levels(readmit_uniq$age_mod))
                                           ))
 
@@ -251,11 +251,30 @@ p_pred_age <- ggplot(age_pred, aes(x = age_mod, y = age_prob)) +
   geom_point(color = "seagreen4", size = 5) +
   ggtitle("Predicted probability of readmission within 30 days by age groups") 
 
+# get predicted probability of readmission at each value of discharge location, holding inpatient visits and age constant
+disch_pred <- with(readmit_uniq, data.frame(number_inpatient = mean(number_inpatient), 
+                                          disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
+                                          age_mod = levels(readmit_uniq$age_mod)[1] # keeping age "constant" (at reference level)
+                                          ))
+
+disch_pred$disch_prob <- predict(fit.logit.1, newdata = disch_pred, type = "response")
+
+# plotting
+p_pred_disch <- disch_pred %>%
+  mutate(disch_disp_modified = recode_factor(disch_disp_modified, "Discharged to home" = "Home", 
+                                             "Discharged to home with Home Health Service" = "Home Health Service",
+                                             "Discharged/Transferred to SNF" = "Skilled Nursing Facility",
+                                             "Other" = "Other")) %>%
+  ggplot(aes(x = disch_disp_modified, y = disch_prob)) + 
+  geom_line(aes(group = 1), color = "grey") +
+  geom_point(color = "seagreen4", size = 5) +
+  ggtitle("Predicted probability of readmission within 30 days by discharge location") 
+
+
 ## get predicted probability of readmission at each value of inpatient visits, holding age and discharge location constant
 # create new df
-inpatient_pred <- with(readmit_uniq, data.frame(number_inpatient = rep(seq(from = 0, to = 15, length.out = 100), 4), # get 110 data points to get
-                                                                                                                    # smoother lines repeated 4x
-                                                                                                                    # as 4 age bins/discharge levels
+inpatient_pred <- with(readmit_uniq, data.frame(number_inpatient = rep(seq(from = 0, to = 15, length.out = 100)), # get 100 data points to get
+                                                                                                                    # smooth line
                                     disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
                                     age_mod = factor(levels(readmit_uniq$age_mod))
                                     ))
@@ -267,9 +286,8 @@ p_pred_inpatient <- ggplot(inpatient_pred, aes(x = number_inpatient, y = inpatie
   geom_smooth(color = "seagreen4") +
   ggtitle("Predicted probability of readmission within 30 days by number of inpatient visits in the previous year")
 
-ggarrange(p_pred_age, p_pred_inpatient, ncol = 2, common.legend = T) # nrow = 2,
+ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common.legend = T) # nrow = 2,
 
-# haven't managed to make it work for discharge location yet, something weird about the way predicted values are outputted...
 
 ```
 
@@ -503,6 +521,7 @@ fit.logit.1 <- glm(readmit_30 ~ ., family = binomial, data = data.train.lasso.m)
 
 # check significance of variables
 Anova(fit.logit.1)
+summary(fit.logit.1)
 ```
 
 All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. Each predictor identified also makes sense logically: increased age would be correlated with disease severity and the ability to recover from acute diabetes complications; the  number of inpatient hospitalizations in the previous year would also correlate with overall health status and disease severity; and the discharge location would strongly influence the type of recuperative care that patients receive post-hospitalization, which could prevent readmission. 
