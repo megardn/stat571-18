@@ -9,9 +9,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Group Member 1" />
-<meta name="author" content="Group Member 2" />
-<meta name="author" content="Group Member 3" />
+<meta name="author" content="Diego G. Dávila" />
+<meta name="author" content="Margaret Gardner" />
+<meta name="author" content="Joelle Bagautdinova" />
 
 
 <title>Modern Data Mining, HW 4</title>
@@ -243,9 +243,9 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Modern Data Mining, HW 4</h1>
-<h4 class="author">Group Member 1</h4>
-<h4 class="author">Group Member 2</h4>
-<h4 class="author">Group Member 3</h4>
+<h4 class="author">Diego G. Dávila</h4>
+<h4 class="author">Margaret Gardner</h4>
+<h4 class="author">Joelle Bagautdinova</h4>
 <h4 class="date">11:59 pm, 03/20, 2021</h4>
 
 </div>
@@ -253,11 +253,11 @@ div.tocify {
 
 <div style="page-break-after: always;"></div>
 <div id="overview" class="section level1" number="1">
-<h1><span class="header-section-number">1</span> Overview</h1>
+<h1 number="1"><span class="header-section-number">1</span> Overview</h1>
 <p>Logistic regression is used for modeling categorical response variables. The simplest scenario is how to identify risk factors of heart disease? In this case the response takes a possible value of <code>YES</code> or <code>NO</code>. Logit link function is used to connect the probability of one being a heart disease with other potential risk factors such as <code>blood pressure</code>, <code>cholestrol level</code>, <code>weight</code>. Maximum likelihood function is used to estimate unknown parameters. Inference is made based on the properties of MLE. We use AIC to help nailing down a useful final model. Predictions in categorical response case is also termed as <code>Classification</code> problems. One immediately application of logistic regression is to provide a simple yet powerful classification boundaries. Various metrics/criteria are proposed to evaluate the quality of a classification rule such as <code>False Positive</code>, <code>FDR</code> or <code>Mis-Classification Errors</code>.</p>
 <p>LASSO with logistic regression is a powerful tool to get dimension reduction.</p>
 <div id="objectives" class="section level2" number="1.1">
-<h2><span class="header-section-number">1.1</span> Objectives</h2>
+<h2 number="1.1"><span class="header-section-number">1.1</span> Objectives</h2>
 <ul>
 <li><p>Understand the model</p>
 <ul>
@@ -293,7 +293,7 @@ div.tocify {
 </ul>
 </div>
 <div id="r-markdown-knitr-tips" class="section level2" number="1.2">
-<h2><span class="header-section-number">1.2</span> R Markdown / Knitr tips</h2>
+<h2 number="1.2"><span class="header-section-number">1.2</span> R Markdown / Knitr tips</h2>
 <p>You should think of this R Markdown file as generating a polished report, one that you would be happy to show other people (or your boss). There shouldn’t be any extraneous output; all graphs and code run should clearly have a reason to be run. That means that any output in the final file should have explanations.</p>
 <p>A few tips:</p>
 <ul>
@@ -308,7 +308,7 @@ div.tocify {
 </ul>
 </div>
 <div id="review" class="section level2" number="1.3">
-<h2><span class="header-section-number">1.3</span> Review</h2>
+<h2 number="1.3"><span class="header-section-number">1.3</span> Review</h2>
 <p>Review the code and concepts covered in</p>
 <ul>
 <li>Module Logistic Regressions/Classification</li>
@@ -316,12 +316,12 @@ div.tocify {
 </ul>
 </div>
 <div id="this-homework" class="section level2" number="1.4">
-<h2><span class="header-section-number">1.4</span> This homework</h2>
+<h2 number="1.4"><span class="header-section-number">1.4</span> This homework</h2>
 <p>We have two parts in this homework. Part I is guided portion of work, designed to get familiar with elements of logistic regressions/classification. Part II, we bring you projects. You have options to choose one topic among either Credit Risk via LendingClub or Diabetes and Health Management. Find details in the projects.</p>
 </div>
 </div>
 <div id="part-i-framingham-heart-disease-study" class="section level1" number="2">
-<h1><span class="header-section-number">2</span> Part I: Framingham heart disease study</h1>
+<h1 number="2"><span class="header-section-number">2</span> Part I: Framingham heart disease study</h1>
 <p>We will continue to use the Framingham Data (<code>Framingham.dat</code>) so that you are already familiar with the data and the variables. All the results are obtained through training data.</p>
 <p>Liz is a patient with the following readings: <code>AGE=50, GENDER=FEMALE, SBP=110, DBP=80, CHOL=180, FRW=105, CIG=0</code>. We would be interested to predict Liz’s outcome in heart disease.</p>
 <p>To keep our answers consistent, use a subset of the data, and exclude anyone with a missing entry. For your convenience, we’ve loaded it here together with a brief summary about the data.</p>
@@ -357,9 +357,9 @@ div.tocify {
       930   0  53 FEMALE 125  85  255  74   0
       471   0  55   MALE 136  96  250 102   0</code></pre>
 <div id="identify-risk-factors" class="section level2" number="2.1">
-<h2><span class="header-section-number">2.1</span> Identify risk factors</h2>
+<h2 number="2.1"><span class="header-section-number">2.1</span> Identify risk factors</h2>
 <div id="understand-the-likelihood-function" class="section level3" number="2.1.1">
-<h3><span class="header-section-number">2.1.1</span> Understand the likelihood function</h3>
+<h3 number="2.1.1"><span class="header-section-number">2.1.1</span> Understand the likelihood function</h3>
 <p>Conceptual questions to understand the building blocks of logistic regression. All the codes in this part should be hidden. We will use a small subset to run a logistic regression of <code>HD</code> vs. <code>SBP</code>.</p>
 <ol style="list-style-type: lower-roman">
 <li>Take a random subsample of size 5 from <code>hd_data_f</code> which only includes <code>HD</code> and <code>SBP</code>. Also set <code>set.seed(50)</code>. List the five observations neatly below. No code should be shown here.</li>
@@ -388,7 +388,7 @@ div.tocify {
 <p>Based on the model fit to the randomly sampled 5 subjects, Liz’s probability of having heart disease is 0.242.</p>
 </div>
 <div id="identify-important-risk-factors-for-heart.disease." class="section level3" number="2.1.2">
-<h3><span class="header-section-number">2.1.2</span> Identify important risk factors for <code>Heart.Disease.</code></h3>
+<h3 number="2.1.2"><span class="header-section-number">2.1.2</span> Identify important risk factors for <code>Heart.Disease.</code></h3>
 <p>We focus on understanding the elements of basic inference method in this part. Let us start a fit with just one factor, <code>SBP</code>, and call it <code>fit1</code>. We then add one variable to this at a time from among the rest of the variables. For example</p>
 <pre><code>## 
 ## Call:
@@ -462,7 +462,7 @@ div.tocify {
 <p>Yes, all variables are significant at the 0.01 level. The p-values for the chi-squared test are as reported above (6.83e-15, 3.00e-10 for SBP, SEX respectively). The p-values for Wald’s test are 5.9e-13, 3.8e-11, for SBP, SEX respectively. These are not the same across tests.</p>
 </div>
 <div id="model-building" class="section level3" number="2.1.3">
-<h3><span class="header-section-number">2.1.3</span> Model building</h3>
+<h3 number="2.1.3"><span class="header-section-number">2.1.3</span> Model building</h3>
 <p>Start with all variables. Our goal is to fit a well-fitting model, that is still small and easy to interpret (parsimonious).</p>
 <ol style="list-style-type: lower-roman">
 <li>Use backward selection method. Only keep variables whose coefficients are significantly different from 0 at .05 level. Kick out the variable with the largest p-value first, and then re-fit the model to see if there are other variables you want to kick out.</li>
@@ -537,7 +537,7 @@ div.tocify {
 <p>Based on our final model, Liz has a 3.36% probability of being diagnosed with heart disease.</p>
 </div>
 <div id="rocfdr" class="section level3" number="2.1.4">
-<h3><span class="header-section-number">2.1.4</span> ROC/FDR</h3>
+<h3 number="2.1.4"><span class="header-section-number">2.1.4</span> ROC/FDR</h3>
 <ol style="list-style-type: lower-roman">
 <li>Display the ROC curve using <code>fit1</code>. Explain what ROC reports and how to use the graph. Specify the classifier such that the False Positive rate is less than .1 and the True Positive rate is as high as possible.</li>
 </ol>
@@ -618,7 +618,7 @@ div.tocify {
 <p>Based on the above plots, I would go with Fit2, in this case - as it can achieve a higher set of these values across thresholds.</p>
 </div>
 <div id="cost-function-bayes-rule" class="section level3" number="2.1.5">
-<h3><span class="header-section-number">2.1.5</span> Cost function/ Bayes Rule</h3>
+<h3 number="2.1.5"><span class="header-section-number">2.1.5</span> Cost function/ Bayes Rule</h3>
 <p>Bayes rules with risk ratio <span class="math inline">\(\frac{a_{10}}{a_{01}}=10\)</span> or <span class="math inline">\(\frac{a_{10}}{a_{01}}=1\)</span>. Use your final model obtained from Part 1 to build a class of linear classifiers.</p>
 <ol style="list-style-type: lower-roman">
 <li>Write down the linear boundary for the Bayes classifier if the risk ratio of <span class="math inline">\(a_{10}/a_{01}=10\)</span>.</li>
@@ -648,12 +648,12 @@ div.tocify {
 </div>
 </div>
 <div id="part-ii-project" class="section level1" number="3">
-<h1><span class="header-section-number">3</span> Part II: Project</h1>
+<h1 number="3"><span class="header-section-number">3</span> Part II: Project</h1>
 <div id="project-option-1-credit-risk-via-lendingclub" class="section level2" number="3.1">
-<h2><span class="header-section-number">3.1</span> Project Option 1 Credit Risk via LendingClub</h2>
+<h2 number="3.1"><span class="header-section-number">3.1</span> Project Option 1 Credit Risk via LendingClub</h2>
 </div>
 <div id="project-opetion-2-diabetes-and-health-management" class="section level2" number="3.2">
-<h2><span class="header-section-number">3.2</span> Project Opetion 2 Diabetes and Health Management</h2>
+<h2 number="3.2"><span class="header-section-number">3.2</span> Project Opetion 2 Diabetes and Health Management</h2>
 </div>
 </div>
 

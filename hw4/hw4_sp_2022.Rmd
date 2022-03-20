@@ -1,9 +1,9 @@
 ---
 title: " Modern Data Mining, HW 4"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Dávila
+- Margaret Gardner
+- Joelle Bagautdinova
 date: '11:59 pm, 03/20, 2021'
 output:
   html_document:
