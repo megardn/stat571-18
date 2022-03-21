@@ -208,7 +208,7 @@ annotate_figure(p_probs, top = text_grob("Predicted probaility of readmission wi
 
 Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. The fact that discharge to home appears to be protective of readmission may reflect the relative lack of disease severity in these patients, but may also provide an interesting avenue of further research to explore what type of post-discharge supports the prevention of readmission.
 
-One important limitation of our study is the predictive ability of our model itself; while it predicted readmission well in the training dataset it was built on, prediction error was higher in an independent validation sample. Other limitations of our study include lack of predictors that were either not captured in the study, such as medical insurance information and patients' socioeconomic status, or not useable due to incompleteness, such as blood tests. Furthermore, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states, potentially limiting generalizability.
+One important limitation of our study is the predictive ability of our model itself; while it has a low error rate in terms of misclassifying patients, it does not identify many patients who go on to be readmitted. Other limitations of our study include lack of predictors that were either not captured in the study, such as medical insurance information and patients' socioeconomic status, or not useable due to incompleteness, such as blood tests. Furthermore, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states, potentially limiting generalizability.
 
 # Detailed process of the analysis
 
@@ -234,7 +234,7 @@ readmit_data <- readmit_data %>% mutate(encounter_id = as.factor(encounter_id),
 skim(readmit_data)
 ```
 
-We removed the `A1Cresult` and `max_glu_serum` variables since there the majority of rows contain missing values (0.05% and 0.1% non-NA values in `max_glu_serum` and `A1Cresult`, respectively). Few other variables seem to be missing from our dataset.
+We removed the `A1Cresult` and `max_glu_serum` variables since there the majority of rows contain missing values (0.05% and 0.1% non-NA values in `max_glu_serum` and `A1Cresult`, respectively). Few other data points seem to be missing from our dataset.
  
 ```{r}
 # dropping variables with mostly NAs
@@ -281,7 +281,7 @@ p1 <- ggplot(readmit_data, aes(x=readmitted)) +
 p2 <- ggplot(readmit_uniq, aes(x=readmitted)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmitted)) + 
   ylim(0, 0.75) +
-  labs(title = "Readmission in random subset", y="Percent") +
+  labs(title = "Readmission in random Subset", y="Percent") +
   theme(plot.title = element_text(size=15))
 p3 <- ggplot(readmit_data, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
@@ -289,7 +289,7 @@ p3 <- ggplot(readmit_data, aes(x = readmit_30)) +
   theme(plot.title = element_text(size=15))
 p4 <- ggplot(readmit_uniq, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission within 30 days in random dataset", y="Percent") +
+  labs(title = "Readmission within 30 days in random subset", y="Percent") +
   theme(plot.title = element_text(size=15))
 
 ggarrange(p1, p2, ncol = 2, common.legend = T)
@@ -299,6 +299,7 @@ ggarrange(p3, p4, ncol = 2, common.legend = T)
 We can observe that:
 * around 10% of the full sample is readmitted within 1 month
 * around 7% of the latest hospital admission is readmitted within 1 month
+
 
 Further exploratory visualizations are performed to obtain an initial sense of which variables may play a role in whether patients are readmitted within 30 days or not:
 
@@ -566,6 +567,13 @@ pROC::auc(data.val$readmit_30, fit.logit.val)
 #calculate MCE
 MCE.val <- (2 * sum(fit.logit.bayes.f[data.val$readmit_30 == "1"] != "1") 
                       + sum(fit.logit.bayes.f[data.val$readmit_30 == "0"] != "0"))/length(data.val$readmit_30)
+fit.val.pred <- ifelse(fit.logit.val > .333, "1", "0")
+confusionMatrix(data = as.factor(fit.val.pred),         # predicted value
+                       reference = data.val$readmit_30,              # true results as reference
+                       positive = levels(data.val$readmit_30)[2])    # the positive result
+fit.val.pred.f<-as.factor(fit.val.pred)
+MCE.val <- (2*sum(fit.val.pred.f[data.val$readmit_30 == "1"] != "1")
+              + sum(fit.val.pred.f[data.val$readmit_30 == "0"] != "0"))/length(data.val$readmit_30)
 MCE.val
 ```
 
@@ -576,7 +584,7 @@ save.image("Mini_Project_Diabetes.RData")
 
 ```
 
-Our model fits the validation data similarly to the training data with AUC=0.648. However, our MCE is higher (0.498), indicating our model is more likely to misclassify individuals in the validation dataset than the training dataset. 
+Our model fits the validation data similarly to the training data with AUC=0.648 and predicts with a similar accuracy (training MCE=`r MCE.bayes`, validation MCE=`r MCE.val`). Overall, our model can predict readmission in our validation sample with low sensitivity (0.0138) and but high specificity (0.999).
 
 # Conclusion
 
@@ -584,7 +592,7 @@ Our  model identified advanced age, number of inpatient hospitalizations within 
 
 In particular, our model indicates that patients who are readmitted to inpatient care are most likely to require readmission within 30 days. This could be an indication of greater disease severity in these individuals, requiring frequent hospitalization, but could also be influenced by the ability of patients to manage their disease outside the hospital. As a chronic condition, diabetes requires vigilant symptom management on the part of patients. One could imagine that patients who do not have access to regular blood-glucose testing or healthy food options may struggle to keep symptoms under control, leading to readmission. Similarly, access to stable and regular outpatient care could support patients in managing their symptoms and provide monitoring from providers who could intervene before a patient would require hospitalization. While one may argue that this is counter to our finding that discharge to home is protective against readmission, there are several possible explanations. Firstly, patients with less severe disease are more likely to be discharged home than more critically ill patients, reducing the overall incidence of readmission in home-discharged individuals. Furthermore, our data does not capture any of the benefits that individuals discharged to home may have, including outpatient provider access or strong family supports. Future studies could explore this possibility by surveying patient attitudes towards and knowledge about diabetes management, access to necessary medical supplies and nutrition options, and support of family and medical providers.
 
-One important limitation of our study is the predictive ability of our model itself; while it had a low misclassification error rate (MCE) in the training dataset (`r MCE.bayes`) , the MCE was higher in our validation sample (`r MCE.val`). While some discrepancy is expected given the expected variability of individuals between datasets, this does limit the strength of our model and recommendations. 
+One important limitation of our study is the predictive ability of our model itself; while it had a low misclassification error rate (MCE) (`r MCE.val`), sensitivity was also low, capturing only about 1% of readmitted subjects. This indicates that there are likely latent factors not included in our dataset that are influencing readmission.
 
 Other limitations of our study include missing data points, particularly among biological measures such as serum glucose and HbA1c, which could provide direct and unbiased assessments of patients' diabetes severity. HbA1c in particular is indicative of blood glucose levels over several months and could provide important insight into the health status of individuals at readmission. Other potentially important predictors include medical insurance information and patients' socioeconomic status, which unfortunately can have strong determinations in a patients' access to care and therefore can potentially predict health status. Finally, while the dataset is large, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states. Therefore, these results could be disproportionately influenced by the healthcare environment of the Northeast (including treatment norms, insurance standards, or state law) and should be generalized with caution. 
 
