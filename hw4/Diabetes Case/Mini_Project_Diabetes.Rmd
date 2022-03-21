@@ -112,7 +112,7 @@ p_age <- readmit_uniq %>%
   mutate(readmit_30 = recode_factor(readmit_30, "0" = "No", "1" = "Yes")) %>%
   ggplot(aes(x = age_mod, fill = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..)), position = "dodge") + 
-    labs(title = "Readmission within 30 days by age bins", y="Percent")
+    labs(title = "Readmission by age groups", y="Percent")
 
 # plotting discharge location
 p_disch <- readmit_uniq %>%
@@ -125,7 +125,7 @@ p_disch <- readmit_uniq %>%
                                              "Other" = "Other")) %>%
   ggplot(aes(x = disch_disp_modified, fill = readmit_30)) + 
     geom_bar(aes(y = (..count..)/sum(..count..)), position = "dodge") + 
-    labs(title = "Readmission within 30 days by discharge location", y="Percent")
+    labs(title = "Readmission by discharge location", y="Percent")
 
 # plotting number of inpatient visits
 p_inpatient <- readmit_uniq %>%
@@ -134,7 +134,7 @@ p_inpatient <- readmit_uniq %>%
   mutate(readmit_30 = recode_factor(readmit_30, "0" = "No", "1" = "Yes")) %>%
   ggplot(aes(x = readmit_30, y = number_inpatient, fill = readmit_30, color = readmit_30)) + 
     geom_boxplot() + 
-    labs(title = "Readmission within 30 days by number of inpatient visits in the previous year", 
+    labs(title = "Readmission by number of inpatient visits", 
          y = "Number of inpatient visits in the previous year")
 
 # outputting plots
@@ -143,6 +143,8 @@ annotate_figure(p_main_risk_factors, top = text_grob("Main factors impacting the
 
 
 ```
+
+
 ```{r plotting predictions, fig.width = 10, fig.height = 10}
 
 # get predicted probability of readmission at each value of age, holding inpatient visits and discharge location constant
@@ -158,7 +160,7 @@ age_pred$age_prob <- predict(fit.logit.1, newdata = age_pred, type = "response")
 p_pred_age <- ggplot(age_pred, aes(x = age_mod, y = age_prob)) + 
   geom_line(aes(group = 1), color = "grey") +
   geom_point(color = "seagreen4", size = 5) +
-  ggtitle("Predicted probability of readmission within 30 days by age groups") 
+  ggtitle("Predicted probability of readmission by age groups") 
 
 # get predicted probability of readmission at each value of discharge location, holding inpatient visits and age constant
 disch_pred <- with(readmit_uniq, data.frame(number_inpatient = mean(number_inpatient), 
@@ -177,7 +179,7 @@ p_pred_disch <- disch_pred %>%
   ggplot(aes(x = disch_disp_modified, y = disch_prob)) + 
   geom_line(aes(group = 1), color = "grey") +
   geom_point(color = "seagreen4", size = 5) +
-  ggtitle("Predicted probability of readmission within 30 days by discharge location") 
+  ggtitle("Predicted probability of readmission by discharge location") 
 
 
 ## get predicted probability of readmission at each value of inpatient visits, holding age and discharge location constant
@@ -193,7 +195,7 @@ inpatient_pred$inpatient_prob <- predict(fit.logit.1, newdata = inpatient_pred, 
 # plotting
 p_pred_inpatient <- ggplot(inpatient_pred, aes(x = number_inpatient, y = inpatient_prob)) +
   geom_smooth(color = "seagreen4") +
-  ggtitle("Predicted probability of readmission within 30 days by number of inpatient visits in the previous year")
+  ggtitle("Predicted probability of readmission by number of inpatient visits")
 
 p_probs <- ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common.legend = T) # nrow = 2,
 annotate_figure(p_probs, top = text_grob("Predicted probaility of readmission within 30 days for each risk factor", face = "bold", size = 14))
