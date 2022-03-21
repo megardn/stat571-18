@@ -1,16 +1,11 @@
 ---
-<<<<<<< HEAD
 title: "Predicting readmission probability for diabetes inpatients,  HW4 GROUP 18"
 author:
 - Diego G. Dávila
 - Margaret Gardner
 - Joelle Bagautdinova
 date: 'Due before midnight, March 20'
-
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: '4'
   html_document:
     code_folding: hide
     highlight: haddock
@@ -18,6 +13,9 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
   word_document:
     toc: yes
     toc_depth: '4'
@@ -61,16 +59,12 @@ Note then that the most important elements of your report are the clarity of you
 
 ## Background
 
-**Problem:** In the U.S., diabetes is a chronic condition characterized by high blood sugar, leading to important health concerns. Diabetes is a major health care concern, as over 35 million (or 1 in 10) people are affected by this condition in the U.S. alone [CDC](https://www.cdc.gov/chronicdisease/programs-impact/pop/diabetes.htm). It also represents the nation's most expensive chronic condition, with over 237 billion dollars being spent annually on care for individuals with diabetes. Importantly, if diabetes is not detected/managed poorly, this can lead to serious health conditions and may cause the patient to undergo repeated hospital admissions, which in turn involves substantial costs. In addition, insurances no longer reimburse hospitals when patients are readmitted within 30 days, creating a strong incentive for hospitals to improve initial admission care and understand which factors may increase the risk of readmission within 30 days. 
+**Problem:** Diabetes is a chronic condition characterized by high blood sugar and is associated with important health concerns. In the U.S., diabetes is a major health care concern, as over 35 million (or 1 in 10) people are affected by this condition [CDC](https://www.cdc.gov/chronicdisease/programs-impact/pop/diabetes.htm). It also represents the nation's most expensive chronic condition, with over 237 billion dollars being spent annually on care for individuals with diabetes. Importantly, if diabetes is not detected/managed poorly, this can lead to serious health conditions and may cause the patient to undergo repeated hospital admissions, which in turn involves substantial costs. In addition, insurances no longer reimburse hospitals when patients are readmitted within 30 days, creating a strong incentive for hospitals to improve initial admission care and understand which factors may increase the risk of readmission within 30 days. 
 
-**Solution:** The goal of this study is to determine which factors significantly impact the risk of readmission within 30 days. We address this question using a public open dataset containing data collected from 70,000 patients with a total of 100,000 admissions over a period of 10 years (1999-2008) in 130 states, provided by the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University. In what follow, we provide a brief summary of the data and an overview of the main findings. Finally, general conclusions and recommendations are made to improve care for diabetes and avoid short-term readmission.
+**Solution:** The goal of this study is to determine which factors significantly impact the risk of readmission within 30 days. We address this question using a public dataset containing data collected from 70,000 patients with a total of 100,000 admissions over a period of 10 years (1999-2008) in 130 states, provided by the [Center for Clinical and Translational Research](https://archive.ics.uci.edu/ml/datasets/Diabetes+130-US+hospitals+for+years+1999-2008) at Virginia Commonwealth University. Here, we provide a brief summary of the data, followed by overview of the main findings. Finally, general conclusions and recommendations are made to improve care for diabetes and avoid short-term readmission (e.g., readmission within 30 days of discharge).
 
 
 ## Brief data summary
-  
-To investigate factors associated with readmission within 30 days, we analyzed data from ### unique patients' diabetes-related hospitalizations occurring between 1999 and 2008.Our dataset included: basic demographic information about the patients, such as age, gender and race; information about the hospitalization, such as what level of care they were admitted to and how long the were hospitalized for; counts of hospitalizations from the previous year; results from blood tests; changes in medications; and diagnoses.
-  
-Overall, around `r round(sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)*100, 0)`% of patients admitted to a hospital had to be readmitted within 30 days. This indicates suboptimal care during the first admission event, leading to poorer health outcomes and increasing the risk of repeated hospitalizations. This also represents a heavy financial burden for hospitals, given that healthcare for these 7% of patients is not reimbursed by insurances. 
 
 ```{r load workspace}
 
@@ -78,6 +72,11 @@ Overall, around `r round(sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)*100,
 load("Mini_Project_Diabetes.RData")
 
 ```
+  
+To investigate factors associated with readmission within 30 days, we analyzed data from `r nrow(readmit_uniq)` unique patients' diabetes-related hospitalizations occurring between 1999 and 2008.Our dataset included: basic demographic information about the patients, such as age, gender and race; information about the hospitalization, such as what level of care they were admitted to and how long the were hospitalized for; counts of hospitalizations from the previous year; results from blood tests; changes in medications; and diagnoses.
+  
+Overall, around `r round(sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)*100, 0)`% of patients admitted to a hospital had to be readmitted within 30 days. This indicates suboptimal care during the first admission event, leading to poorer health outcomes and increasing the risk of repeated hospitalizations. This also represents a heavy financial burden for hospitals, given that healthcare for these 7% of patients is not reimbursed by insurances. 
+
 
 ```{r plotting exec summary}
 # bar plot showing readmit_30 proportions
@@ -103,9 +102,9 @@ Results indicate that the following factors increase the risk of readmission wit
 * **Discharge location**: patients discharged at specialized care facilities are at higher risk of short-term readmission.
 * **Age**: older individuals are more likely to require a short-term readmission. 
 
-More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location is an indirect indication of disease severity, where patients with poorer health conditions tend to be discharged are specialized care facilities. Given their generally poorer health state, these patients have an increased risk of short-term readmission. 
+More specifically, the  number of inpatient hospitalizations in the previous year can be understood as a general health indicator, where individuals with poorer health generally will require more medical attention and thus present a higher risk of being readmitted within 30 days. Old age is similarly associated with poorer health and additionally implies a reduced ability to recover from acute diabetes complications, again increasing the risk of short-term readmission. Finally, the discharge location is an indirect indication of disease severity, where patients with poorer health conditions tend to be discharged at specialized care facilities. Given their generally poorer health state, these patients have an increased risk of short-term readmission. 
 
-```{r plotting main findings}
+```{r plotting main findings, fig.width = 10, fig.height = 10}
 
 # plotting age bins
 p_age <- readmit_uniq %>%
@@ -139,8 +138,12 @@ p_inpatient <- readmit_uniq %>%
          y = "Number of inpatient visits in the previous year")
 
 # outputting plots
-ggarrange(p_age, p_inpatient, p_disch, ncol = 2, nrow = 2, common.legend = T)
+p_main_risk_factors <- ggarrange(p_age, p_inpatient, p_disch, ncol = 2, nrow = 2, common.legend = T)
+annotate_figure(p_main_risk_factors, top = text_grob("Main factors impacting the risk of readmission within 30 days", face = "bold", size = 14))
 
+
+```
+```{r plotting predictions, fig.width = 10, fig.height = 10}
 
 # get predicted probability of readmission at each value of age, holding inpatient visits and discharge location constant
 age_pred <- with(readmit_uniq, data.frame(number_inpatient = mean(number_inpatient), 
@@ -179,10 +182,10 @@ p_pred_disch <- disch_pred %>%
 
 ## get predicted probability of readmission at each value of inpatient visits, holding age and discharge location constant
 # create new df
-inpatient_pred <- with(readmit_uniq, data.frame(number_inpatient = rep(seq(from = 0, to = 15, length.out = 100)), # get 100 data points to get
+inpatient_pred <- with(readmit_uniq, data.frame(number_inpatient = rep(seq(from = 0, to = 15, length.out = 100), 16), # get 100 data points to get
                                                                                                                     # smooth line
-                                    disch_disp_modified = factor(levels(readmit_uniq$disch_disp_modified)),
-                                    age_mod = factor(levels(readmit_uniq$age_mod))
+                                    disch_disp_modified = factor(rep(levels(readmit_uniq$disch_disp_modified), each = 400)), # change level every 400 rows
+                                    age_mod = factor(rep(levels(readmit_uniq$age_mod), each = 100)) # change level every 100 rows
                                     ))
 
 inpatient_pred$inpatient_prob <- predict(fit.logit.1, newdata = inpatient_pred, type = "response")
@@ -192,17 +195,16 @@ p_pred_inpatient <- ggplot(inpatient_pred, aes(x = number_inpatient, y = inpatie
   geom_smooth(color = "seagreen4") +
   ggtitle("Predicted probability of readmission within 30 days by number of inpatient visits in the previous year")
 
-ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common.legend = T) # nrow = 2,
-
+p_probs <- ggarrange(p_pred_age, p_pred_disch, p_pred_inpatient, ncol = 2, nrow = 2, common.legend = T) # nrow = 2,
+annotate_figure(p_probs, top = text_grob("Predicted probaility of readmission within 30 days for each risk factor", face = "bold", size = 14))
 
 ```
 
 
 
-
 ## Limitations and conclusion
 
-Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. The fact that discharge to home appears to be protective of readmission may reflect the relative lack of disease severity in these patients, but may also provide an interesting avenue of further research to explore what type of post-discharge supports prevent readmission.
+Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. The fact that discharge to home appears to be protective of readmission may reflect the relative lack of disease severity in these patients, but may also provide an interesting avenue of further research to explore what type of post-discharge supports the prevention of readmission.
 
 One important limitation of our study is the predictive ability of our model itself; while it predicted readmission well in the training dataset it was built on, prediction error was higher in an independent validation sample. Other limitations of our study include lack of predictors that were either not captured in the study, such as medical insurance information and patients' socioeconomic status, or not useable due to incompleteness, such as blood tests. Furthermore, [the hospitals sampled are not evenly distributed across the United States](https://www.hindawi.com/journals/bmri/2014/781670/#supplementary-materials), with a strong over representation of Northeastern states, potentially limiting generalizability.
 
@@ -238,7 +240,7 @@ readmit_data <- readmit_data %>%
   select(-c(A1Cresult, max_glu_serum))
 ```
 
-We are also adding a variable encoding the cumulative number of admissions per patient (`nb_admissions`). While this variable cannot include hospitalizations that were not captured by the team, either because they were outside of the 130 hospitals sampled or prior to 1999, this will provide an longer overview of a particular patients' health leading up to the admission than the 1-year snapshots collected in the original dataset.
+We are also adding a variable encoding the cumulative number of admissions per patient (`nb_admissions`). While this variable cannot include hospitalizations that were not captured by the team, either because they were outside of the 130 hospitals sampled or prior to 1999, this will provide a longer overview of a particular patients' health leading up to the admission than the 1-year snapshots collected in the original dataset.
 
 ```{r}
 readmit_data <- readmit_data %>%
@@ -345,8 +347,10 @@ readmit_uniq %>%
     facet_wrap(~disch_disp_modified) +
     labs(title = "Readmission within 30 days by discharge location", y="Percent")
 
-# could do the same for the remaining factors about diabetes medication, discharge, admission
+```
 
+
+```{r, fig.width = 10, fig.height = 10, warning=FALSE, message=FALSE}
 # numerical variables
 readmit_uniq %>% 
   select(readmit_30, time_in_hospital, num_lab_procedures, num_procedures, num_medications, 
@@ -424,7 +428,7 @@ Anova(fit.logit.1)
 summary(fit.logit.1)
 ```
 
-All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. Each predictor identified also makes sense logically: increased age would be correlated with disease severity and the ability to recover from acute diabetes complications; the  number of inpatient hospitalizations in the previous year would also correlate with overall health status and disease severity; and the discharge location would strongly influence the type of recuperative care that patients receive post-hospitalization, which could prevent readmission. 
+All variables are significant! It seems based on our data that the time spent in the hospital, number of previous inpatient admissions, number of diagnoses, where a patient is discharged to after treatment, and age are significant predictors of an individual's chances of readmission within 30 days. Each predictor identified also makes sense logically: increased age would be correlated with disease severity and the ability to recover from acute diabetes complications; the  number of inpatient hospitalizations in the previous year would also correlate with overall health status and disease severity; finally, the discharge location is an indirect indication of disease severity, where patients with poorer health conditions tend to be discharged at specialized care facilities. Given their generally poorer health state, these patients have an increased risk of short-term readmission. 
 
 We'll build another model using bestglm to test against our LASSO model. Since bestglm accepts an upper limit of 15 predictors, we'll subset the training data to 15 predictors (including factor levels) based on our EDA and a prior knowledge. `Race` and `age_mod` were included due to the observed potential associations of Race=Caucasian and age_mod=60-70 yrs, respectively,  with readmission in our EDA; `gender` was included as part of biomedical convention, as sex differences have been observed in many diseases and can have large consequences for public health; and `num_medications` was chosen as a proxy for disease severity, as patients requiring more medications during hospitalization likely suffer a more severe or complex form of disease and may be more likely to relapse.
 
@@ -572,7 +576,7 @@ Our model fits the validation data similarly to the training data with AUC=0.648
 
 Our  model identified advanced age, number of inpatient hospitalizations within the past year, and discharge location as being predictive of readmission within 30 days. While many of these risk factors are not inherently modifiable, they can be used to target individuals for additional support. Post-discharge outpatient care and educating patients about disease management could be cost-effective ways to reduce readmission in at-risk patients, including those over the age of 60 and those with a history of recent inpatient admissions. 
 
-In particular, our model indicates that patients who are readmitted to inpatient care are most likely to require readmission within 30 days. This could be an indication of greater disease severity in these individuals, requiring frequent hospitalization, but could also be influenced by the ability of patients to manage their disease outside the hospital. As a chronic condition, diabetes requires vigalent symptom management on the part of patients. One could imagine that patients who do not have access to regular blood-glucose testing or healthy food options may struggle to keep symptoms under control, leading to readmission. Similarly, access to stable and regular outpatient care could support patients in managing their symptoms and provide monitoring from providers who could intervene before a patient would require hospitalization. While one may argue that this is counter to our finding that discharge to home is protective against readmission, there are several possible explanations. Firstly, patients with less severe disease are more likely likely to be discharged home than more critically ill patients, reducing the overall incidence of readmission in home-discharged individuals. Furthermore, our data does not capture any of the benefits that individuals discharged to home may have, including outpatient provider access or strong family supports. Future studies could explore this possibility by surveying patient attitudes towards and knowledge about diabetes management, access to necessary medical supplies and nutrition options, and support of family and medical providers.
+In particular, our model indicates that patients who are readmitted to inpatient care are most likely to require readmission within 30 days. This could be an indication of greater disease severity in these individuals, requiring frequent hospitalization, but could also be influenced by the ability of patients to manage their disease outside the hospital. As a chronic condition, diabetes requires vigilant symptom management on the part of patients. One could imagine that patients who do not have access to regular blood-glucose testing or healthy food options may struggle to keep symptoms under control, leading to readmission. Similarly, access to stable and regular outpatient care could support patients in managing their symptoms and provide monitoring from providers who could intervene before a patient would require hospitalization. While one may argue that this is counter to our finding that discharge to home is protective against readmission, there are several possible explanations. Firstly, patients with less severe disease are more likely to be discharged home than more critically ill patients, reducing the overall incidence of readmission in home-discharged individuals. Furthermore, our data does not capture any of the benefits that individuals discharged to home may have, including outpatient provider access or strong family supports. Future studies could explore this possibility by surveying patient attitudes towards and knowledge about diabetes management, access to necessary medical supplies and nutrition options, and support of family and medical providers.
 
 One important limitation of our study is the predictive ability of our model itself; while it had a low misclassification error rate (MCE) in the training dataset (`r MCE.bayes`) , the MCE was higher in our validation sample (`r MCE.val`). While some discrepancy is expected given the expected variability of individuals between datasets, this does limit the strength of our model and recommendations. 
 
