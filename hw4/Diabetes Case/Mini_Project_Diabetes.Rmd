@@ -179,7 +179,7 @@ p_pred_disch <- disch_pred %>%
   ggplot(aes(x = disch_disp_modified, y = disch_prob)) + 
   geom_line(aes(group = 1), color = "grey") +
   geom_point(color = "seagreen4", size = 5) +
-  ggtitle("Predicted probability of readmission by discharge location") 
+  ggtitle("Predicted prob. of readmission by discharge location") 
 
 
 ## get predicted probability of readmission at each value of inpatient visits, holding age and discharge location constant
@@ -276,17 +276,21 @@ sum(readmit_uniq$readmit_30==1)/nrow(readmit_uniq)
 p1 <- ggplot(readmit_data, aes(x=readmitted)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmitted)) + 
   ylim(0, 0.75) +
-  labs(title = "Readmission in Full Dataset", y="Percent")
+  labs(title = "Readmission in full dataset", y="Percent") +
+  theme(plot.title = element_text(size=15))
 p2 <- ggplot(readmit_uniq, aes(x=readmitted)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmitted)) + 
   ylim(0, 0.75) +
-  labs(title = "Readmission in Random Hosp Subset", y="Percent")
+  labs(title = "Readmission in random subset", y="Percent") +
+  theme(plot.title = element_text(size=15))
 p3 <- ggplot(readmit_data, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission within 30 days in Full Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in full dataset", y="Percent") +
+  theme(plot.title = element_text(size=15))
 p4 <- ggplot(readmit_uniq, aes(x = readmit_30)) + 
   geom_bar(aes(y = (..count..)/sum(..count..), fill = readmit_30)) + 
-  labs(title = "Readmission within 30 days in Random Hosp Subset", y="Percent")
+  labs(title = "Readmission within 30 days in random dataset", y="Percent") +
+  theme(plot.title = element_text(size=15))
 
 ggarrange(p1, p2, ncol = 2, common.legend = T)
 ggarrange(p3, p4, ncol = 2, common.legend = T)
