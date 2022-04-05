@@ -309,8 +309,32 @@ str(yelp_data)
 
 a) Which time period were the reviews collected in this data?
 
+```{r}
+yelp_data %>% 
+  summarise(start.date = as.Date(min(date)),
+            end.date = as.Date(max(date)))
+```
+The reviews were collected between Oct. 19th, 2004 and Oct. 4th, 2018. 
+
 b) Are ratings (with 5 levels) related to month of the year or days of the week? Only address this through EDA please. 
 
+```{r}
+
+month.of.year <- months(as.Date(yelp_data$date)) # extract the months
+day.of.week <- weekdays(as.Date(yelp_data$date)) # extract the day
+
+print("Proportion Table: Days of Week - Within a Day")
+prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y starts)
+print("Proportion Table: Days of Week - Within a Star")
+prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
+
+print("Proportion Table: Month of Year - Within a Month")
+prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y starts)
+print("Proportion Table: Month of Year - Within a Star")
+prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
+```
+
+It appears based on the above proportion tables that there is no major relationship between day of the week or month of the year and review score. 
 
 ii. Document term matrix (dtm)
  
