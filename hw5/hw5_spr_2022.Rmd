@@ -383,6 +383,16 @@ head(data2)
 
 Get a training data with 13000 reviews and the 5000 reserved as the testing data. Keep the rest (2000) as our validation data set. 
 
+```{r}
+set.seed(1) # for reproducibility
+train.idx <- sample(nrow(data2), 13000) # extract 13000 reviews to use as training data
+test.idx <- sample(seq(1, nrow(data2))[-train.idx], 5000) # extract 5000 reviews to use as testing data that were not in training data
+validation.idx <- sample(seq(1, nrow(data2))[-c(train.idx, test.idx)], nrow(data2) - 13000 - 5000) # extract remaining rows as validation data
+data2.test <- data2[test.idx,] # create test data
+data2.train <- data2[train.idx,] # create training data
+data2.validation <- data2[validation.idx,] # create validation data
+```
+
 ## 2. LASSO
 
 i. Use the training data to get Lasso fit. Choose lambda.1se. Keep the result here.
