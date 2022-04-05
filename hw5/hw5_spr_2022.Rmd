@@ -25,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F)
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger)
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm)
 ```
 
 
@@ -329,9 +329,9 @@ print("Proportion Table: Days of Week - Within a Star")
 prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
 
 print("Proportion Table: Month of Year - Within a Month")
-prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y starts)
+prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on month X what proportion were Y starts)
 print("Proportion Table: Month of Year - Within a Star")
-prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
+prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X month)
 ```
 
 It appears based on the above proportion tables that there is no major relationship between day of the week or month of the year and review score. 
@@ -340,11 +340,44 @@ ii. Document term matrix (dtm)
  
  Extract document term matrix for texts to keep words appearing at least .5% of the time among all 20000 documents. Go through the similar process of cleansing as we did in the lecture. 
 
+```{r}
+just.text <- yelp_data$text # get just the review text
+full.corpus <- VCorpus(VectorSource(just.text)) # convert to corpus
+# create controls for data processing
+clist <- list(tolower = TRUE, 
+                    removePunctuation = TRUE,
+                    removeNumbers = TRUE, 
+                    stopwords = stopwords("english"), 
+                    stemming = TRUE)
+doc.term.matrix.full <- DocumentTermMatrix(cleaned.full.corpus, control = clist) # create the matrix
+doc.term.matrix <- removeSparseTerms(doc.term.matrix.full, 1-.005)  # remove words that appear in fewer than 0.5 percent reviews
+inspect(doc.term.matrix)
+```
+
 a) Briefly explain what does this matrix record? What is the cell number at row 100 and column 405? What does it represent?
+
+This matrix records the amount of times that a particular word comes up in a given review. 
+
+```{r}
+inspect(doc.term.matrix[100, 405])
+```
+
+At row 100, column 405, we have a number 0. This corresponds to the amount of times that the word experience (cropped to experienc in the processed matrix) appears in document 100. 
 
 b) What is the sparsity of the dtm obtained here? What does that mean?
 
+The sparsity of the matrix is 97% here, meaning that 97% of the elements are zero. Thsi means that 97% of the time a given word does not appear in a given document. 
+
 iii. Set the stars as a two category response variable called rating to be “1” = 5,4 and “0”= 1,2,3. Combine the variable rating with the dtm as a data frame called data2. 
+
+```{r}
+# create rating variable
+rating <- yelp_data %>%
+  transmute(rating = ifelse(stars == 5 | stars == 4, 1, 0)) 
+# make data2 with the dtm and rating
+data2 <- data.frame(rating, as.matrix(doc.term.matrix)) 
+head(data2)
+```
 
 ## Analysis
 
