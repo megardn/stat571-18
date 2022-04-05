@@ -1,9 +1,9 @@
 ---
 title: "Modern Data Mining - HW 5"
 author:
-- Group Member 1
-- Group Member 2
-- Group Member 3
+- Diego G. Dávila
+- Margaret Gardner
+- Joelle Bagautdinova
 date: 'Due: 11:59Pm,  4/10, 2022'
 output:
   html_document:
@@ -351,9 +351,9 @@ i. Briefly summarize the method of Random Forest
 
 ii. Now train the data using the training data set by RF. Get the testing error of majority vote. Also explain how you tune the tuning parameters (`mtry` and `ntree`). 
 
-## 4. Boosting 
+## 4. Boosting - REMOVED
 
-To be determined. 
+SECTION REMOVED
 
 
 ## 5.  PCA first
