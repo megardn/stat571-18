@@ -25,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F)
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger)
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally)
 ```
 
 
@@ -213,7 +213,7 @@ Yelp has made their data available to public and launched Yelp challenge. [More 
 
 For this case study, we downloaded the [data](https://www.yelp.com/dataset/download) and took a 20k subset from **review.json**. *json* is another format for data. It is flexible and commonly-used for websites. Each item/subject/sample is contained in a brace *{}*. Data is stored as **key-value** pairs inside the brace. *Key* is the counterpart of column name in *csv* and *value* is the content/data. Both *key* and *value* are quoted. Each pair is separated by a comma. The following is an example of one item/subject/sample.
 
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -225,7 +225,7 @@ For this case study, we downloaded the [data](https://www.yelp.com/dataset/downl
 
 **yelp_review_20k.json** contains full review text data including the user_id that wrote the review and the business_id the review is written for. Here's an example of one review.
 
-```{json}
+```{json, eval=FALSE}
 {
     // string, 22 character unique review id
     "review_id": "zdSx_SD6obEhz9VrW9uAWA",
@@ -269,7 +269,7 @@ The goals are
 i. Load *json* data
 
 The *json* data provided is formatted as newline delimited JSON (ndjson). It is relatively new and useful for streaming.
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -281,7 +281,7 @@ The *json* data provided is formatted as newline delimited JSON (ndjson). It is 
 ```
 
 The traditional JSON format is as follows.
-```{json}
+```{json, eval=F}
 [{
   "key1": "value1",
   "key2": "value2"
@@ -309,18 +309,90 @@ str(yelp_data)
 
 a) Which time period were the reviews collected in this data?
 
+```{r}
+yelp_data %>% 
+  summarise(start.date = as.Date(min(date)),
+            end.date = as.Date(max(date)))
+```
+The reviews were collected between Oct. 19th, 2004 and Oct. 4th, 2018. 
+
 b) Are ratings (with 5 levels) related to month of the year or days of the week? Only address this through EDA please. 
 
+```{r}
+
+month.of.year <- months(as.Date(yelp_data$date)) # extract the months
+day.of.week <- weekdays(as.Date(yelp_data$date)) # extract the day
+
+print("Proportion Table: Days of Week - Within a Day")
+prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y stars)
+print("Proportion Table: Days of Week - Within a Star")
+prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
+
+print("Proportion Table: Month of Year - Within a Month")
+prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on month X what proportion were Y starts)
+print("Proportion Table: Month of Year - Within a Star")
+prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X month)
+
+#messing around with plots
+days <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+yelp_data <- yelp_data %>% mutate(month=factor(months(as.Date(yelp_data$date)), levels=month.name),
+                     weekday=factor(weekdays(as.Date(yelp_data$date)), levels=days)) #adding month and weekday cols
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=month)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Month", fill="stars")
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=weekday)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Day of the Week", fill="stars")
+```
+
+It appears based on the above proportion tables that there is no major relationship between day of the week or month of the year and review score. 
 
 ii. Document term matrix (dtm)
  
  Extract document term matrix for texts to keep words appearing at least .5% of the time among all 20000 documents. Go through the similar process of cleansing as we did in the lecture. 
 
+```{r}
+just.text <- yelp_data$text # get just the review text
+full.corpus <- VCorpus(VectorSource(just.text)) # convert to corpus
+# create controls for data processing
+clist <- list(tolower = TRUE, 
+                    removePunctuation = TRUE,
+                    removeNumbers = TRUE, 
+                    stopwords = stopwords("english"), 
+                    stemming = TRUE)
+doc.term.matrix.full <- DocumentTermMatrix(full.corpus, control = clist) # create the matrix
+doc.term.matrix <- removeSparseTerms(doc.term.matrix.full, 1-.005)  # remove words that appear in fewer than 0.5 percent reviews
+inspect(doc.term.matrix)
+```
+
 a) Briefly explain what does this matrix record? What is the cell number at row 100 and column 405? What does it represent?
+
+This matrix records the amount of times that a particular word comes up in a given review. 
+
+```{r}
+inspect(doc.term.matrix[100, 405])
+```
+
+At row 100, column 405, we have a number 0. This corresponds to the amount of times that the word experience (cropped to experienc in the processed matrix) appears in review 100. 
 
 b) What is the sparsity of the dtm obtained here? What does that mean?
 
+The sparsity of the matrix is 97% here, meaning that 97% of the elements are zero. This means that 97% of the time a given word does not appear in a given document. 
+
 iii. Set the stars as a two category response variable called rating to be “1” = 5,4 and “0”= 1,2,3. Combine the variable rating with the dtm as a data frame called data2. 
+
+```{r}
+# create rating variable
+rating <- yelp_data %>%
+  transmute(rating = ifelse(stars == 5 | stars == 4, 1, 0)) 
+# make data2 with the dtm and rating
+data2 <- data.frame(rating, as.matrix(doc.term.matrix)) 
+head(data2)
+```
 
 ## Analysis
 
