@@ -23,9 +23,10 @@ urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F)
+knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F, echo=F)
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm)
+
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud)
 ```
 
 
@@ -213,7 +214,7 @@ Yelp has made their data available to public and launched Yelp challenge. [More 
 
 For this case study, we downloaded the [data](https://www.yelp.com/dataset/download) and took a 20k subset from **review.json**. *json* is another format for data. It is flexible and commonly-used for websites. Each item/subject/sample is contained in a brace *{}*. Data is stored as **key-value** pairs inside the brace. *Key* is the counterpart of column name in *csv* and *value* is the content/data. Both *key* and *value* are quoted. Each pair is separated by a comma. The following is an example of one item/subject/sample.
 
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -225,7 +226,7 @@ For this case study, we downloaded the [data](https://www.yelp.com/dataset/downl
 
 **yelp_review_20k.json** contains full review text data including the user_id that wrote the review and the business_id the review is written for. Here's an example of one review.
 
-```{json}
+```{json, eval=FALSE}
 {
     // string, 22 character unique review id
     "review_id": "zdSx_SD6obEhz9VrW9uAWA",
@@ -269,7 +270,7 @@ The goals are
 i. Load *json* data
 
 The *json* data provided is formatted as newline delimited JSON (ndjson). It is relatively new and useful for streaming.
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -281,7 +282,7 @@ The *json* data provided is formatted as newline delimited JSON (ndjson). It is 
 ```
 
 The traditional JSON format is as follows.
-```{json}
+```{json, eval=F}
 [{
   "key1": "value1",
   "key2": "value2"
@@ -324,7 +325,8 @@ month.of.year <- months(as.Date(yelp_data$date)) # extract the months
 day.of.week <- weekdays(as.Date(yelp_data$date)) # extract the day
 
 print("Proportion Table: Days of Week - Within a Day")
-prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y starts)
+
+prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y stars)
 print("Proportion Table: Days of Week - Within a Star")
 prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
 
@@ -332,6 +334,22 @@ print("Proportion Table: Month of Year - Within a Month")
 prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on month X what proportion were Y starts)
 print("Proportion Table: Month of Year - Within a Star")
 prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X month)
+
+
+#messing around with plots
+days <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+yelp_data <- yelp_data %>% mutate(month=factor(months(as.Date(yelp_data$date)), levels=month.name),
+                     weekday=factor(weekdays(as.Date(yelp_data$date)), levels=days)) #adding month and weekday cols
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=month)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Month", fill="stars")
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=weekday)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Day of the Week", fill="stars")
 ```
 
 It appears based on the above proportion tables that there is no major relationship between day of the week or month of the year and review score. 
@@ -349,14 +367,15 @@ clist <- list(tolower = TRUE,
                     removeNumbers = TRUE, 
                     stopwords = stopwords("english"), 
                     stemming = TRUE)
-doc.term.matrix.full <- DocumentTermMatrix(cleaned.full.corpus, control = clist) # create the matrix
+
+doc.term.matrix.full <- DocumentTermMatrix(full.corpus, control = clist) # create the matrix
 doc.term.matrix <- removeSparseTerms(doc.term.matrix.full, 1-.005)  # remove words that appear in fewer than 0.5 percent reviews
 inspect(doc.term.matrix)
 ```
 
 a) Briefly explain what does this matrix record? What is the cell number at row 100 and column 405? What does it represent?
 
-This matrix records the amount of times that a particular word comes up in a given review. 
+This matrix records the amount of times that a particular word appears in a given review. 
 
 ```{r}
 inspect(doc.term.matrix[100, 405])
@@ -397,20 +416,83 @@ data2.validation <- data2[validation.idx,] # create validation data
 
 i. Use the training data to get Lasso fit. Choose lambda.1se. Keep the result here.
 
+```{r}
+Y <- data2.train[, 1] # extract Y
+X <- sparse.model.matrix(rating~., data=data2.train)[, -1] # get design matrix without the first col of 1's
+set.seed(1)  # to control the randomness in K folds 
+fit.lasso <- cv.glmnet(X, Y, alpha=1, nfolds=10, family="binomial")
+plot(fit.lasso) #plot lambdas
+
+coef.1se <- coef(fit.lasso, s="lambda.1se") #variables ID'd 
+lasso.words <- coef.1se@Dimnames[[1]] [coef.1se@i][-1] # non-zero variables without intercept. 
+```
+
 ii. Feed the output from Lasso above, get a logistic regression. 
 	
+```{r}
+sel_cols <- c("rating", lasso.words) #select y and LASSO variables
+data2.train_sub <- data2.train %>% select(all_of(sel_cols)) #subset data
+fit.glm <- glm(rating~., family=binomial, data2.train_sub) #run glm
+```
+
 a) Pull out all the positive coefficients and the corresponding words. Rank the coefficients in a decreasing order. Report the leading 2 words and the coefficients. Describe briefly the interpretation for those two coefficients. 
+
+```{r}
+fit.glm.coef <-coef(fit.glm) #pull logistic coef
+good.glm <- fit.glm.coef[which(fit.glm.coef > 0)] #positive words
+good.glm <- good.glm[-1] %>% #remove intercept
+  sort(decreasing=TRUE) %>% #sort
+  round(4)
+good.glm[1:2] #leading 2 words
+```
+
+Among all the words used in the sampled reviews, "thorough" and "delight" are most predictive of a high rating. For each time that "thorough" or "delight" are used in a review, the log(odds) of the rating being 4 or 5 stars increases by about 2.5487 and 1.6607, respectively. 
 
 b) Make a word cloud with the top 100 positive words according to their coefficients. Interpret the cloud briefly.
 
+```{r, message=FALSE, warning=FALSE, results= TRUE}
+cor.special <- brewer.pal(8,"Dark2")  #set color scheme
+wordcloud(names(good.glm[1:100]), good.glm[1:100],  # make a word cloud
+          colors=cor.special, ordered.colors=F)
+```
+Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "nevery worry" or similar. - really not sure i explained that well
+
 c) Repeat i) and ii) for the bag of negative words.
+
+```{r}
+bad.glm <- fit.glm.coef[which(fit.glm.coef < 0)] #negative words
+bad.glm <-sort(-bad.glm, decreasing = TRUE) %>%
+  round(4)
+bad.glm[1:2] #leading 2 words
+```
+
+Out of all words stems to appear in the reviews, "wors" and "rude" are most predictive of a low (3 or fewer star) rating. For each time that "wors" or "rude" are used in a review, the log(odds) of the rating being 4 or 5 stars decreases by about 2.4189 and 2.1739, respectively. 
+
+```{r, message=FALSE, warning=FALSE, results= TRUE}
+wordcloud(names(bad.glm[1:100]), bad.glm[1:100],  # make a word cloud
+          colors=cor.special, ordered.colors=F)
+```
+
+The words most strongly predictive of a negative review are those that suggest unpleasant interactions and/or food quality, such as "rude", "terribl", "overcook" and "gross". Interestingly, both "woman" and "women" are identified as being associated with lower ratings; though further analysis would be necessary to determine the root of this association, it may reflect differing attitudes toward and expectations of women in customer service roles.
 
 d) Summarize the findings. 
 
 iii. Using majority votes find the testing errors
 	i) From Lasso fit in 3)
+```{r}
+predict.lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") #output majority vote labels
+mean(data2.test$rating != predict.lasso) #testing error - i think this is what they're asking for?
+```
 	ii) From logistic regression in 4)
+```{r}
+predict.glm <- predict(fit.glm, data2.test, type = "response") #prediction for testing data
+class.glm <- ifelse(predict.glm > .5, "1", "0")
+
+testerror.glm <- mean(data2.test$rating != class.glm) #find prediction error for data.test
+```
 	iii) Which one is smaller?
+	
+The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)`) is smaller than that of the logistic regression (`r testerror.glm`).
 
 ## 3. Random Forest  
 
