@@ -532,7 +532,7 @@ save(error.vector, file = "mse_mtry.Rdata")
 ```
 
 ```{r}
-error.vector <- load("mse_mtry.Rdata")
+load("mse_mtry.Rdata")
 # plot the MSE
 plot(1:max.vars, error.vector, pch=16,
      main = "MSE, 150 Trees",
