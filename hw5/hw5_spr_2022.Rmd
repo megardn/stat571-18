@@ -549,8 +549,10 @@ As we can see, the OOB classification error begins to plateau around 20 variable
 
 ```{r}
 rf.fit.final <- randomForest(rating~., data2.train, mtry=20, ntree=150) # fit the final random forest model
-
+rf.fit.final$err.rate[150, 1]
 ```
+
+The OOB testing error of majoirty vote is: 0.162. 
 
 To optimize 
 ## 4. Boosting - REMOVED
