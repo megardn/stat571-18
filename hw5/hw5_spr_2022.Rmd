@@ -531,7 +531,7 @@ registerDoParallel(cluster1) # register our cluster
 
 max.vars <- 50
 error.vector <- foreach(x = 1:max.vars, .combine = 'c') %dopar% {
-  randomForest(rating~., data2.train, mtry=x, ntree=150)
+  temp.fit <- randomForest(rating~., data2.train, mtry=x, ntree=150)
   temp.fit$mse[150] 
   }
 
