@@ -26,7 +26,7 @@ urlcolor: blue
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F, echo=F)
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud)
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel)
 ```
 
 
@@ -455,7 +455,7 @@ cor.special <- brewer.pal(8,"Dark2")  #set color scheme
 wordcloud(names(good.glm[1:100]), good.glm[1:100],  # make a word cloud
           colors=cor.special, ordered.colors=F)
 ```
-Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "nevery worry" or similar. - really not sure i explained that well
+Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "nevery worry" or similar. 
 
 c) Repeat i) and ii) for the bag of negative words.
 
@@ -483,6 +483,7 @@ iii. Using majority votes find the testing errors
 predict.lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") #output majority vote labels
 mean(data2.test$rating != predict.lasso) #testing error - i think this is what they're asking for?
 ```
+
 	ii) From logistic regression in 4)
 ```{r}
 predict.glm <- predict(fit.glm, data2.test, type = "response") #prediction for testing data
@@ -498,7 +499,51 @@ The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)
 
 i. Briefly summarize the method of Random Forest
 
+Random Forest methods consist of leveraging multiple decision trees to solve classification or regression problems. Some number of decision trees are initialized, each using a subset of the available variables, and a bootstrapped sampled of the data. In the case of a regression problem, the aggregated output is typically an average of all predictions based on each decision tree. In the case of a classification problem, the aggregated output is typically a majority vote, based on the classification by each decision tree. - [FEEL FREE TO EXPAND]
+
 ii. Now train the data using the training data set by RF. Get the testing error of majority vote. Also explain how you tune the tuning parameters (`mtry` and `ntree`). 
+
+```{r}
+set.seed(1) # for reproducibility
+# first we tune the parameters
+rf.fit1 <- randomForest(rating~., data2.train, mtry=6, ntree=250)
+plot(rf.fit1, type="p", pch=16,col="green4", main = "Out of Bag MSE")
+```
+
+In order to tune the ntree parameter, we have plotted the Out of Bag Mean Squared Error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible. Since the computing power required is not high, we selected to use 150 trees. 
+
+```{r}
+#max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
+# this will take a LONG time on its own, so we'll implement parallel processing for our loop. 
+
+numCores <- detectCores() # detect the number of available cores. 
+cluster1 <- makeCluster(numCores-2, # number of cores to use, let's leave 1 core free
+                         type = "FORK") # type of cluster, FORK lets us use stuff already in session
+registerDoParallel(cluster1) # register our cluster 
+
+
+#max.vars <- 50
+#error.vector <- 1:max.vars # to save the errors
+#for (i in 1:max.vars){
+#  temp.fit <- randomForest(rating~., data2.train, mtry=i, ntree=150) # fir a tree with mtry = i
+#  error.vector[i] <- temp.fit$mse[150] # save the error at mtry = i, with ntree constant
+#}
+
+max.vars <- 50
+error.vector <- foreach(x = 1:max.vars, .combine = 'c') %dopar% {
+  randomForest(rating~., data2.train, mtry=x, ntree=150)
+  temp.fit$mse[150] 
+  }
+
+stopCluster(cluster1) # close the cluster
+
+# plot the MSE
+plot(1:max.vars, error.vector, pch=16,
+     main = "MSE, 150 Trees",
+     xlab="mtry parameter",
+     ylab="OOB MSE")
+lines(1:max.vars, error.vector)
+```
 
 ## 4. Boosting - REMOVED
 
