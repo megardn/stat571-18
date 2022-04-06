@@ -26,7 +26,7 @@ urlcolor: blue
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F, echo=F)
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel)
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel, tidyselect)
 ```
 
 
@@ -392,7 +392,7 @@ iii. Set the stars as a two category response variable called rating to be â€œ1â
 ```{r}
 # create rating variable
 rating <- yelp_data %>%
-  transmute(rating = ifelse(stars == 5 | stars == 4, 1, 0)) 
+  transmute(rating = as.factor(ifelse(stars == 5 | stars == 4, 1, 0)) )
 # make data2 with the dtm and rating
 data2 <- data.frame(rating, as.matrix(doc.term.matrix)) 
 head(data2)
@@ -512,6 +512,8 @@ plot(rf.fit1, type="p", pch=16,col="green4", main = "Out of Bag MSE")
 
 In order to tune the ntree parameter, we have plotted the Out of Bag Mean Squared Error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible. Since the computing power required is not high, we selected to use 150 trees. 
 
+Now, we will focus on optimizing mtry. To do this, we will do randomForest over a range of mtry values, with ntree held constant, and plot the MSE for each value. Because this process will be computationally expensive, I have run my code with parallel processing and saved the output to mse_mtry.Rdata, so as to not have to re-run this chunk. 
+
 ```{r, eval=FALSE}
 #max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
 # this will take a LONG time on its own, so we'll implement parallel processing for our loop. 
@@ -531,6 +533,7 @@ stopCluster(cluster1) # close the cluster
 save(error.vector, file = "mse_mtry.Rdata")
 ```
 
+
 ```{r}
 load("mse_mtry.Rdata")
 # plot the MSE
@@ -541,6 +544,14 @@ plot(1:max.vars, error.vector, pch=16,
 lines(1:max.vars, error.vector)
 ```
 
+As we can see, the MSE begins to plateau around 50 variables, so we can select this as our mtry. 
+
+```{r}
+rf.fit.final <- randomForest(rating~., data2.train, mtry=50, ntree=150) # fit the final random forest model
+
+```
+
+To optimize 
 ## 4. Boosting - REMOVED
 
 SECTION REMOVED
