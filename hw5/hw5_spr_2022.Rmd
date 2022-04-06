@@ -512,7 +512,7 @@ plot(rf.fit1, type="p", pch=16,col="green4", main = "Out of Bag MSE")
 
 In order to tune the ntree parameter, we have plotted the Out of Bag Mean Squared Error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible. Since the computing power required is not high, we selected to use 150 trees. 
 
-```{r}
+```{r, eval=FALSE}
 #max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
 # this will take a LONG time on its own, so we'll implement parallel processing for our loop. 
 
@@ -521,22 +521,18 @@ cluster1 <- makeCluster(numCores-2, # number of cores to use, let's leave 1 core
                          type = "FORK") # type of cluster, FORK lets us use stuff already in session
 registerDoParallel(cluster1) # register our cluster 
 
-
-#max.vars <- 50
-#error.vector <- 1:max.vars # to save the errors
-#for (i in 1:max.vars){
-#  temp.fit <- randomForest(rating~., data2.train, mtry=i, ntree=150) # fir a tree with mtry = i
-#  error.vector[i] <- temp.fit$mse[150] # save the error at mtry = i, with ntree constant
-#}
-
-max.vars <- 50
+max.vars <- 60
 error.vector <- foreach(x = 1:max.vars, .combine = 'c') %dopar% {
   temp.fit <- randomForest(rating~., data2.train, mtry=x, ntree=150)
   temp.fit$mse[150] 
   }
-
 stopCluster(cluster1) # close the cluster
 
+save(error.vector, file = "mse_mtry.Rdata")
+```
+
+```{r}
+error.vector <- load("mse_mtry.Rdata")
 # plot the MSE
 plot(1:max.vars, error.vector, pch=16,
      main = "MSE, 150 Trees",
