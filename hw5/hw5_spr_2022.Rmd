@@ -431,7 +431,7 @@ ii. Feed the output from Lasso above, get a logistic regression.
 	
 ```{r}
 sel_cols <- c("rating", lasso.words) #select y and LASSO variables
-data2.train_sub <- data2.train %>% select(all_of(sel_cols)) #subset data
+data2.train_sub <- data2.train %>% dplyr::select(all_of(sel_cols)) #subset data
 fit.glm <- glm(rating~., family=binomial, data2.train_sub) #run glm
 ```
 
@@ -536,6 +536,7 @@ save(error.vector, file = "mse_mtry.Rdata")
 
 
 ```{r}
+max.vars <- 60
 load("mse_mtry.Rdata")
 # plot the MSE
 plot(1:max.vars, error.vector, pch=16,
@@ -552,7 +553,7 @@ rf.fit.final <- randomForest(rating~., data2.train, mtry=20, ntree=150) # fit th
 rf.fit.final$err.rate[150, 1]
 ```
 
-The OOB testing error of majoirty vote is: `rf.fit.final$err.rate[150, 1]`. 
+The OOB testing error of majority vote is: `rf.fit.final$err.rate[150, 1]`. 
 
 To optimize 
 ## 4. Boosting - REMOVED
