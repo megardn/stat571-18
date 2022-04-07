@@ -381,7 +381,7 @@ This matrix records the amount of times that a particular word appears in a give
 inspect(doc.term.matrix[100, 405])
 ```
 
-At row 100, column 405, we have a number 0. This corresponds to the amount of times that the word experience (cropped to experienc in the processed matrix) appears in document 100. 
+At row 100, column 405, we have a number 0. This corresponds to the amount of times that a particular word (the word in column 405) appears in document 100. 
 
 b) What is the sparsity of the dtm obtained here? What does that mean?
 
@@ -568,7 +568,7 @@ SECTION REMOVED
 
 i. Perform PCA (better to do sparse PCA) for the input matrix first. Decide how many PC's you may want to take and why.
 
-```{r, eval=FALSE}
+```{r}
 set.seed(1)
 # using sparse matrix (terms appear in at least 0.5% reviews)
 terms.df <- data2.train[,-1] #remove rating
@@ -628,6 +628,25 @@ The testing error of the LASSO fit modeled using the 100 leading PCs is 0.1362, 
 
 i. Take average of some of the  models built above (also try all of them) and this gives us the fifth model. Report it's testing error. (Do you have more models to be bagged, try it.)
 
+```{r}
+# create a function to find the mode. Taken from: https://stackoverflow.com/questions/2547402/how-to-find-the-statistical-mode
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# we'll use majority vote
+ensemble.model.predict.all <- data.frame(predict(fit.pca, pc.test[,1:100], type = "class", s="lambda.1se"),     # PCA + LASSO 
+                                predict(rf.fit.final, data2.test),                                              # Random Forest
+                                ifelse(predict(fit.glm, data2.test, type = "response") > .5, "1", "0"),         # Logistic Regression
+                                predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") # LASSO 
+                           )
+ensemble.model.predict.vote <- apply(ensemble.model.predict.all, 2, FUN = Mode)
+ensemble.prediction.error <- mean(data2.test$rating != ensemble.model.predict.vote)
+ensemble.prediction.error
+```
+
+The prediction error of the ensemble of models is `ensemble.prediction.error`. This is far worse than our best fitting model (LASSO). 
 
 ## 7. Final model
 
