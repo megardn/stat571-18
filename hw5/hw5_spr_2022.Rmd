@@ -498,7 +498,61 @@ The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)
 
 i. Briefly summarize the method of Random Forest
 
+Random Forest methods consist of leveraging multiple decision trees to solve classification or regression problems. Some number of decision trees are initialized, each using a subset of the available variables, and a bootstrapped sampled of the data. In the case of a regression problem, the aggregated output is typically an average of all predictions based on each decision tree. In the case of a classification problem, the aggregated output is typically a majority vote, based on the classification by each decision tree. - [FEEL FREE TO EXPAND]
+
 ii. Now train the data using the training data set by RF. Get the testing error of majority vote. Also explain how you tune the tuning parameters (`mtry` and `ntree`). 
+
+```{r}
+set.seed(1) # for reproducibility
+# first we tune the parameters
+rf.fit1 <- randomForest(rating~., data2.train, mtry=6, ntree=250)
+plot(rf.fit1, main = "Testing Error by Number of Trees")
+legend("topright", colnames(rf.fit1$err.rate), col=1:3, cex=0.8, fill=1:3)
+```
+
+In order to tune the ntree parameter, we have plotted the Out of Bag classification error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible past this point. Accordingly, we opted to use 150 trees. 
+
+Now, we will focus on optimizing mtry. To do this, we will do randomForest over a range of mtry values, with ntree held constant, and plot the OOB classification error for each value. Because this process will be computationally expensive, I have run my code with parallel processing and saved the output to mse_mtry.Rdata, so as to not have to re-run this chunk. 
+
+```{r, eval=FALSE}
+#max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
+# this will take a LONG time on its own, so we'll implement parallel processing for our loop. 
+numCores <- detectCores() # detect the number of available cores. 
+cluster1 <- makeCluster(numCores-2, # number of cores to use, let's leave 1 core free
+                         type = "FORK") # type of cluster, FORK lets us use stuff already in session
+registerDoParallel(cluster1) # register our cluster 
+max.vars <- 60
+error.vector <- foreach(x = 1:max.vars, .combine = 'c') %dopar% {
+  temp.fit <- randomForest(rating~., data2.train, mtry=x, ntree=150)
+  temp.fit$err.rate[150,1]
+  }
+stopCluster(cluster1) # close the cluster
+save(error.vector, file = "mse_mtry.Rdata")
+```
+
+
+```{r}
+max.vars <- 60
+load("mse_mtry.Rdata")
+# plot the MSE
+plot(1:max.vars, error.vector, pch=16,
+     main = "OOB Classification Error, 150 Trees",
+     xlab="mtry parameter",
+     ylab="OOB Error")
+lines(1:max.vars, error.vector)
+```
+
+As we can see, the OOB classification error begins to plateau around 20 variables, so we can select this as our mtry. 
+
+```{r}
+rf.fit.final <- randomForest(rating~., data2.train, mtry=20, ntree=150) # fit the final random forest model
+rf.fit.final$err.rate[150, 1]
+predict.rf <- predict(rf.fit.final, data2.test)
+test.data.error <- mean(data2.test$rating != predict.rf) 
+```
+The testing error of majority vote is: `test.data.error`. 
+
+To optimize 
 
 ## 4. Boosting - REMOVED
 
