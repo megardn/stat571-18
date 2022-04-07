@@ -511,9 +511,9 @@ plot(rf.fit1, main = "Testing Error by Number of Trees")
 legend("topright", colnames(rf.fit1$err.rate), col=1:3, cex=0.8, fill=1:3)
 ```
 
-In order to tune the ntree parameter, we have plotted the Out of Bag Majority Vote Testing Error, against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible at this point. Accordingly, we opted to use 150 trees. 
+In order to tune the ntree parameter, we have plotted the Out of Bag classification error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible past this point. Accordingly, we opted to use 150 trees. 
 
-Now, we will focus on optimizing mtry. To do this, we will do randomForest over a range of mtry values, with ntree held constant, and plot the OOB Testing Error for each value. Because this process will be computationally expensive, I have run my code with parallel processing and saved the output to mse_mtry.Rdata, so as to not have to re-run this chunk. 
+Now, we will focus on optimizing mtry. To do this, we will do randomForest over a range of mtry values, with ntree held constant, and plot the OOB classification error for each value. Because this process will be computationally expensive, I have run my code with parallel processing and saved the output to mse_mtry.Rdata, so as to not have to re-run this chunk. 
 
 ```{r, eval=FALSE}
 #max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
@@ -540,7 +540,7 @@ max.vars <- 60
 load("mse_mtry.Rdata")
 # plot the MSE
 plot(1:max.vars, error.vector, pch=16,
-     main = "OOB Error, 150 Trees",
+     main = "OOB Classification Error, 150 Trees",
      xlab="mtry parameter",
      ylab="OOB Error")
 lines(1:max.vars, error.vector)
@@ -555,7 +555,7 @@ rf.fit.final$err.rate[150, 1]
 predict.rf <- predict(rf.fit.final, data2.test)
 test.data.error <- mean(data2.test$rating != predict.rf) 
 ```
-The OOB testing error of majority vote is: `test.data.error`. 
+The testing error of majority vote is: `test.data.error`. 
 
 To optimize 
 ## 4. Boosting - REMOVED
