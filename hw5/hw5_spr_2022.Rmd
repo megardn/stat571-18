@@ -652,9 +652,23 @@ The prediction error of the ensemble of models is `ensemble.prediction.error`. T
 
 Which classifier(s) seem to produce the least testing error? Are you surprised? Report the final model and accompany the validation error. Once again this is THE only time you use the validation data set.  For the purpose of prediction, comment on how would you predict a rating if you are given a review (not a tm output) using our final model? 
 
+The model that seems to produce the lowest testing error is the LASSO model. This is not terribly surprising, as LASSO selects the most important words to use in making its prediction. The performance of LASSO is not that far off from Random Forest's, though it is a bit surprising that RF did not perform better. Perhaps using many more trees would improve our performance to the extent that it surpasses LASSO. It is also not terribly surprising that applying PCA first in fact only makes the prediction slightly worse, since PCA needs almost as many components as variables to explain a reasonable amount of variance. It seems PCA may not be well suited for this particular data. The poor performance of the ensemble was surprising, which may be due to the mixing in of a poor model, or perhaps majority vote implementation. 
 
+```{r}
+lasso.validation.prediction <- predict(fit.lasso, as.matrix(data2.validation[, -1]), type = "class", s="lambda.1se") 
+lasso.validation.error <- mean(data2.validation$rating != lasso.validation.prediction)
+lasso.validation.error
+```
 
+The validation error for our final model (LASSO) is `lasso.validation.error`. 
 
+-FEEL FREE TO EXPAND OR GO INTO DETAIL-
+Were we tasked with making a prediction with this model, given a review, we would do the following:
+1. Process the text. This involves cleaning procedures such as removing punctuation, stem words, etc. 
+2. Generate word counts for each word that appears in the review as a data.frame.  
+3. Order the words as appears in the data.frame we used to train our model. 
+4. Convert this data frame to a 1D matrix. 
+5. Feed it as input to the predict() function, using our fit.lasso as the model, with type='class', s='lambda.1se'. 
 
 
 
