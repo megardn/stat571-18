@@ -682,9 +682,23 @@ summary(fit.glm) # same as LASSO with lambda.1se
 
 
 ```{r}
+# lasso
 lasso.validation.prediction <- predict(fit.lasso, as.matrix(data2.validation[, -1]), type = "class", s="lambda.1se") 
 lasso.validation.error <- mean(data2.validation$rating != lasso.validation.prediction)
 lasso.validation.error
+
+# EnProbReduced
+# first apply PC loadings from train to validation data for PC+LASSO prediction
+pc.val <- predict(pc.terms, data2.validation[,-1])
+# calculate average probabilities for validation data 
+df.prob.val <- data2.validation %>% dplyr::select(rating) #initialize df to store outputs
+df.prob.val$pca <- predict(fit.pca, pc.val[,1:100], type = "response", s="lambda.1se") 
+df.prob.val$rf <- predict(rf.fit.final, data2.validation, type="prob")[,2] 
+df.prob.val$lasso <- predict(fit.lasso, as.matrix(data2.validation[, -1]), type = "response", s="lambda.1se") 
+# majority rule classification based on averaged probabilities 
+df.prob.val <- df.prob.val %>%
+  mutate(en.class.noglm = ifelse(rowMeans(df.prob.val[ , c("pca", "rf", "lasso")], na.rm=FALSE) > .5, "1", "0")) 
+prob.validation.error <- mean(data2.validation$rating != df.prob.val$en.class.noglm) # test error on validation data
 ```
 
 The validation error for our final model (LASSO) is `lasso.validation.error`. 
