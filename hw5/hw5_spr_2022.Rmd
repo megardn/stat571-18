@@ -25,7 +25,7 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F)
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger)
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, skimr, car, data.table)
 ```
 
 
@@ -153,6 +153,51 @@ Variable Related to Life Success in 2006
   - validation data: only used in your final model to report the accuracy. 
 
 
+```{r}
+# load data
+df <- read.csv("data/IQ.Full.csv")
+
+# data cleaning
+df <- df %>% 
+  # seet categorical variables as factors
+  mutate(Race = as.factor(Race), 
+         Gender = as.factor(Gender),
+         Imagazine = as.factor(Imagazine),
+         Inewspaper = as.factor(Inewspaper),
+         Ilibrary = as.factor(Ilibrary),
+         log_income = log(Income2005)
+  )  %>%
+  # remove ID and original income variables
+  select(-c(Subject, Income2005))
+
+# label last row as Michelle
+Michelle <- tail(df, n = 1)
+
+# remove the last row
+df <- df %>%
+  filter(row_number() <= n() - 1)
+
+skim(df)
+
+# split data into training, testing and validation
+N <- dim(df)[1]
+n1 <- floor(.7*N) # training = 70%
+n2 <- floor(.2*N) # testing = 20%
+
+set.seed(10)
+
+# Split data to three portions of 70%/20%/10% of data size N
+idx_train <- sample(N, n1)
+idx_no_train <- (which(! seq(1:N) %in% idx_train))
+idx_test <- sample(idx_no_train, n2)
+idx_val <- which(! idx_no_train %in% idx_test)
+data.train <- as.data.frame(df[idx_train,])
+data.test <- as.data.frame(df[idx_test,])
+data.val <- as.data.frame(df[idx_val,])
+
+```
+
+
 ## 2. Factors affect Income
 
 We only use linear models to answer the questions below.
@@ -160,10 +205,70 @@ We only use linear models to answer the questions below.
 i. To summarize ASVAB test scores, create PC1 and PC2 of 10 scores of ASVAB tests and label them as
 ASVAB_PC1 and ASVAB_PC2. Give a quick interpretation of each ASVAB_PC1 and ASVAB_PC2 in terms of the original 10 tests. 
 
+```{r}
+
+# create ASVAB subset
+ASVAB <- df[, 10:19]
+
+# apply PCA with scaling and centering
+ASVAB_pca <- prcomp(ASVAB, scale. = TRUE, center = TRUE)
+
+# display the loadings
+ASVAB_pca$rotation
+
+# add PC1 and PC2 to the df
+df$ASVAB_PC1 <- ASVAB_pca$x[,"PC1"]
+df$ASVAB_PC2 <- ASVAB_pca$x[,"PC2"]
+
+```
+
+
+**Interpretation:** 
+
+* ASVAB_PC1 appears to be a weighted sum of all 10 items and can thus be interpreted as a general ASVAB score. 
+* ASVAB_PC2 appears to capture the difference between performance in more abstract reasoning (Arith, Word, Parag, Numer, Coding, Math) vs more applied tasks (Science, Auto, Mechanic, Elec). 
+
 ii. Is there any evidence showing ASVAB test scores in terms of ASVAB_PC1 and ASVAB_PC2, might affect the Income?  Show your work here. You may control a few other variables, including gender. 
+
+```{r}
+
+# let's start with a simple linear model
+fit1 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2, data = df)
+summary(fit1)
+
+fit2 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender, data = df)
+summary(fit2)
+
+fit3 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Race, data = df)
+Anova(fit3)
+
+fit4 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Educ, data = df)
+summary(fit4)
+
+fit5 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Educ + MotherEd + FatherEd, data = df)
+summary(fit5)
+```
+
+Based on the linear models above, the following observations can be made: 
+
+* ASVAB_PC1 and ASVAB_PC2 both have a significant effect on log_outcome, where having a higher score on either PC is associated with higher income. 
+* Gender has a significant effect, with males earning a higher income compared to females. 
+* Years of education have a significant effect on log_income, where higher years of education for the individual or their father is associated with higher log_income. 
+* Race or years of the mother's or father's education do not significantly impact log_income.
 
 iii. Is there any evidence to show that there is gender bias against either male or female in terms of income in the above model? 
 
+```{r}
+
+# display results of model fit including Gender
+Anova(fit2)
+summary(fit2)
+
+# testing the difference between the reduced model (without Gender) and full model (including Gender)
+anova(fit1, fit2)
+```
+
+Based on the models above, we note that Gender does have a significant effect on log_income. Specifically, males tend to earn 10.097 + 0.09 more log_income compared to females (reference level).  
 
 We next build a few models for the purpose of prediction using all the information available. From now on you may use the three data sets setting (training/testing/validation) when it is appropriate. 
 
@@ -172,21 +277,150 @@ We next build a few models for the purpose of prediction using all the informati
 i. fit1: tree(Income ~ Educ + Gender, data.train) with default set up 
 
     a) Display the tree
-    b) How many end nodes? Briefly explain how the estimation is obtained in each end nodes and deescribe the prediction equation
+  
+    ```{r}
+# fit the tree
+fit1 <- tree(log_income ~ Educ + Gender, data.train)
+
+# view numerical output
+summary(fit1)
+
+# plot the tree
+plot(fit1)
+title(main="log_income ~ Educ + Gender")
+text(fit1)
+
+```
+
+    
+    b) How many end nodes? Briefly explain how the estimation is obtained in each end nodes and describe the prediction equation
+    
+**Answer:** The tree has 4 end nodes, meaning that Gender and Education are partitioned into 4 boxes. The end node estimations correspond to the sample mean log_income for every end node. The prediction equation for this model is: 
+
     c) Does it show interaction effect of Gender and Educ over Income?
+    
+**Answer"** Yes, the tree shows an interaction between gender and income, where being male with more than 15.5 years of education corresponds to the highest log_income, and conversely being female with less than 15.5 years of education is associated with the lowest log_income. 
+
     d) Predict Michelle's income
+
+```{r}
+
+fit.Michelle <- predict(fit1, Michelle)
+fit.Michelle # the fitted salary in log scale is 6.196343 (may not be the same each time we run the rf, why?)
+
+Michelle_pred_income <- exp(fit.Michelle)
+
+```
+
+**Answer"** Michelle's predicted log_income is `r fit.Michelle`, which corresponds to $ `r Mihcelle_pred_income`. 
 
 ii. fit2: fit2 <- rpart(Income2005 ~., data.train, minsplit=20, cp=.009)
 
     a) Display the tree using plot(as.party(fit2), main="Final Tree with Rpart") 
+    
+```{r}
+
+# fit tree using rpart
+fit2 <- rpart(log_income ~., data.train, minsplit = 20, cp = .009)
+
+# plot the rpart tree
+plot(as.party(fit2), main = "Final Tree with Rpart") 
+
+```
+
     b) A brief summary of the fit2
+
+This full tree inclusing all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith), years of education and Esteem10. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. 
+
     c) Compare testing errors between fit1 and fit2. Is the training error from fit2 always less than that from fit1? Is the testing error from fit2 always smaller than that from fit1? 
+    
+```{r}
+
+# training error
+fit1.rss <- summary(fit1)$dev # fit1 RSS
+fit2.rss <- sum(residuals(fit2)^2) # fit2 RSS (fit2 has a different output as rpart was used)
+
+# testing error
+test.error.fit1 <- sum((predict(fit1, data.test) - data.test$log_income)^2)
+test.error.fit2 <- sum((predict(fit2, data.test) - data.test$log_income)^2)
+```
+
+**Answer:** The training error of fit2 (`r fit2.rss`) is smaller than the training error of fit1 (`r fit1.rss`). However, the testing error of fit2 (`r test.error.fit2`) is slightly larger than the testing error of fit1 (`r test.error.fit1`). While the training error always should be smaller for trees that include more variables, this does not necessarily hold true for the testing error, as this corresponds to the model fit on unseen data.  
+
     d) You may prune the fit2 to get a tree with small testing error. 
     
+```{r}
+
+### testing a few pruning options ###
+
+# first print the cps of the rpart object
+# Note: cp = complexity parameter. Any split that does not decrease the overall lack of fit by a factor of cp is not attempted.
+printcp(fit2)
+plotcp(fit2) # plot the cps
+
+# find the option with the smallest error (in xerror)
+fit2$cptable[which.min(fit2$cptable[,"xerror"]),"CP"] # looks like 0.009 was already the optimal cp!
+
+# let's try several of these cp options on the test data to find their testing error 
+
+
+# cp = 0.07
+fit2.p1 <- prune(fit2, cp = 0.07)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.07: ", round(sum((predict(fit2.p1, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.033
+fit2.p2 <- prune(fit2, cp = 0.033)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.033: ", round(sum((predict(fit2.p2, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.02
+fit2.p3 <- prune(fit2, cp = 0.02)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.02: ", round(sum((predict(fit2.p3, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.015
+fit2.p4 <- prune(fit2, cp = 0.015)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.015: ", round(sum((predict(fit2.p4, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.011
+fit2.p5 <- prune(fit2, cp = 0.011)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.011: ", round(sum((predict(fit2.p5, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.0091
+fit2.p6 <- prune(fit2, cp = 0.0091)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.0091: ", round(sum((predict(fit2.p6, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+```
+
+  
+**Answer:** As it turns out, while cp = 0.009 has the smallest training error, cp = 0.015 has the smalles testing error. Thus, let's build the pruned tree using this criterion: 
+
+```{r}
+# summary(fit2.pruned)
+data.table(fit2.p4$frame)
+
+#plot the best subtrees
+par(mfrow=c(1, 2))
+plot(fit2) # main tree
+title(main = "Main tree")
+text(fit2) # main tree
+plot(fit2.p4)
+title(main="Best pruned tree (cp = 0.015)")
+text(fit2.p4) # pruned tree
+
+```
+
+  
 iii. fit3: bag two trees
 
     a) Take 2 bootstrap training samples and build two trees using the 
     rpart(Income2005 ~., data.train.b, minsplit=20, cp=.009). Display both trees.
+    
+```{r}
+
+
+```
+
+
+
     b) Explain how to get fitted values for Michelle by bagging the two trees obtained above. Do not use the predict(). 
     c) What is the testing error for the bagged tree. Is it guaranteed that the testing error by bagging the two tree always smaller that either single tree? 
     
