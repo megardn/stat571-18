@@ -315,7 +315,7 @@ yelp_data %>%
   summarise(start.date = as.Date(min(date)),
             end.date = as.Date(max(date)))
 ```
-The reviews were collected between Oct. 19th, 2004 and Oct. 4th, 2018. 
+The reviews were written between Oct. 19th, 2004 and Oct. 4th, 2018. 
 
 b) Are ratings (with 5 levels) related to month of the year or days of the week? Only address this through EDA please. 
 
@@ -325,7 +325,6 @@ month.of.year <- months(as.Date(yelp_data$date)) # extract the months
 day.of.week <- weekdays(as.Date(yelp_data$date)) # extract the day
 
 print("Proportion Table: Days of Week - Within a Day")
-
 prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y stars)
 print("Proportion Table: Days of Week - Within a Star")
 prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
@@ -385,7 +384,7 @@ At row 100, column 405, we have a number 0. This corresponds to the amount of ti
 
 b) What is the sparsity of the dtm obtained here? What does that mean?
 
-The sparsity of the matrix is 97% here, meaning that 97% of the elements are zero. Thsi means that 97% of the time a given word does not appear in a given document. 
+The sparsity of the matrix is 97% here, meaning that 97% of the elements are zero. This means that 97% of the time a given word does not appear in a given document. 
 
 iii. Set the stars as a two category response variable called rating to be “1” = 5,4 and “0”= 1,2,3. Combine the variable rating with the dtm as a data frame called data2. 
 
@@ -428,7 +427,7 @@ lasso.words <- coef.1se@Dimnames[[1]] [coef.1se@i][-1] # non-zero variables with
 ```
 
 ii. Feed the output from Lasso above, get a logistic regression. 
-	
+
 ```{r}
 sel_cols <- c("rating", lasso.words) #select y and LASSO variables
 data2.train_sub <- data2.train %>% dplyr::select(all_of(sel_cols)) #subset data
@@ -481,7 +480,7 @@ iii. Using majority votes find the testing errors
 	i) From Lasso fit in 3)
 ```{r}
 predict.lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") #output majority vote labels
-mean(data2.test$rating != predict.lasso) #testing error - i think this is what they're asking for?
+testerror.lasso <- mean(data2.test$rating != predict.lasso) #testing error
 ```
 
 	ii) From logistic regression in 4)
@@ -491,6 +490,7 @@ class.glm <- ifelse(predict.glm > .5, "1", "0")
 
 testerror.glm <- mean(data2.test$rating != class.glm) #find prediction error for data.test
 ```
+	
 	iii) Which one is smaller?
 	
 The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)`) is smaller than that of the logistic regression (`r testerror.glm`).
@@ -499,7 +499,7 @@ The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)
 
 i. Briefly summarize the method of Random Forest
 
-Random Forest methods consist of leveraging multiple decision trees to solve classification or regression problems. Some number of decision trees are initialized, each using a subset of the available variables, and a bootstrapped sampled of the data. In the case of a regression problem, the aggregated output is typically an average of all predictions based on each decision tree. In the case of a classification problem, the aggregated output is typically a majority vote, based on the classification by each decision tree. - [FEEL FREE TO EXPAND]
+Random Forest methods consist of leveraging multiple decision trees to solve classification or regression problems. Each tree is built recursively as a series of split-points, each optimized from among a set of variables to minimize misclassification error (for classification) or residual sum of squares (for regression). In Random Forest, some number of such decision trees are initialized, each using a subset of the available variables, and a bootstrapped sampled of the data. In the case of a regression problem, the aggregated output is typically an average of all predictions based on each decision tree. In the case of a classification problem, the aggregated output is typically a majority vote, based on the classification by each decision tree.
 
 ii. Now train the data using the training data set by RF. Get the testing error of majority vote. Also explain how you tune the tuning parameters (`mtry` and `ntree`). 
 
@@ -556,8 +556,6 @@ predict.rf <- predict(rf.fit.final, data2.test)
 test.data.error <- mean(data2.test$rating != predict.rf) 
 ```
 The testing error of majority vote is: `test.data.error`. 
-
-To optimize 
 
 ## 4. Boosting - REMOVED
 
@@ -619,7 +617,7 @@ iii. What is the testing error? Is this testing error better than that obtained 
 ```{r}
 pc.test <- predict(pc.terms, data2.test[,-1]) #apply PC loadings from train to test
 predict.pc.lasso <- predict(fit.pca, pc.test[,1:100], type = "class", s="lambda.1se") #output majority vote labels
-mean(data2.test$rating != predict.pc.lasso) #testing error
+pc.test.er <- mean(data2.test$rating != predict.pc.lasso) #testing error
 ```
 
 The testing error of the LASSO fit modeled using the 100 leading PCs is 0.1362, almost identical for the testing error of the LASSO fit on the original data (0.1342).
@@ -644,6 +642,21 @@ ensemble.model.predict.all <- data.frame(predict(fit.pca, pc.test[,1:100], type 
 ensemble.model.predict.vote <- apply(ensemble.model.predict.all, 2, FUN = Mode)
 ensemble.prediction.error <- mean(data2.test$rating != ensemble.model.predict.vote)
 ensemble.prediction.error
+
+# average probabilities
+df.prob <- data2.test %>% dplyr::select(rating) #initialize df to store outputs
+df.prob$pca <- predict(fit.pca, pc.test[,1:100], type = "response", s="lambda.1se") 
+df.prob$rf <- predict(rf.fit.final, data2.test, type="prob")[,2] 
+df.prob$glm <- predict(fit.glm, data2.test, type = "response") 
+df.prob$lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "response", s="lambda.1se") 
+df.prob <- df.prob %>%
+  mutate(en.class = ifelse(rowMeans(df.prob[ , c(2:5)], na.rm=FALSE) > .5, "1", "0")) # majority rule classification based on averaged probabilities 
+en.prob.testerror <- mean(data2.test$rating != df.prob$en.class)
+
+# reduced ensemble - removing glm, since it has the worst testing error
+df.prob <- df.prob %>%
+  mutate(en.class.noglm = ifelse(rowMeans(df.prob[ , c("pca", "rf", "lasso")], na.rm=FALSE) > .5, "1", "0")) # majority rule classification based on averaged probabilities 
+prob.noglm.testerror <- mean(data2.test$rating != df.prob$en.class.noglm)
 ```
 
 The prediction error of the ensemble of models is `ensemble.prediction.error`. This is far worse than our best fitting model (LASSO). 
@@ -651,6 +664,14 @@ The prediction error of the ensemble of models is `ensemble.prediction.error`. T
 ## 7. Final model
 
 Which classifier(s) seem to produce the least testing error? Are you surprised? Report the final model and accompany the validation error. Once again this is THE only time you use the validation data set.  For the purpose of prediction, comment on how would you predict a rating if you are given a review (not a tm output) using our final model? 
+
+```{r}
+# create a table of all models' testing errors
+df.testerr <- data.frame(model=c('PCA+LASSO', 'RandomForest', 'LogisticReg', 'LASSO', 'EnMode', 'EnProb', 'EnProbReduced'),
+                 test.err=c(pc.test.er, test.data.error, testerror.glm, testerror.lasso, ensemble.prediction.error, en.prob.testerror, prob.noglm.testerror))
+
+df.testerr[which.min(df.testerr$test.err),] #return model with lowest testing error
+```
 
 The model that seems to produce the lowest testing error is the LASSO model. This is not terribly surprising, as LASSO selects the most important words to use in making its prediction. The performance of LASSO is not that far off from Random Forest's, though it is a bit surprising that RF did not perform better. Perhaps using many more trees would improve our performance to the extent that it surpasses LASSO. It is also not terribly surprising that applying PCA first in fact only makes the prediction slightly worse, since PCA needs almost as many components as variables to explain a reasonable amount of variance. It seems PCA may not be well suited for this particular data. The poor performance of the ensemble was surprising, which may be due to the mixing in of a poor model, or perhaps majority vote implementation. 
 
