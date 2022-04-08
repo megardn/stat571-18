@@ -455,7 +455,7 @@ cor.special <- brewer.pal(8,"Dark2")  #set color scheme
 wordcloud(names(good.glm[1:100]), good.glm[1:100],  # make a word cloud
           colors=cor.special, ordered.colors=F)
 ```
-Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "nevery worry" or similar. 
+Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "never worry" or similar. 
 
 c) Repeat i) and ii) for the bag of negative words.
 
