@@ -659,7 +659,7 @@ df.prob <- df.prob %>%
 prob.noglm.testerror <- mean(data2.test$rating != df.prob$en.class.noglm)
 ```
 
-The prediction error of the ensemble of models is `ensemble.prediction.error`. This is far worse than our best fitting model (LASSO). 
+We created several ensemble models based on the Random Forest, LASSO, logistic regression, and PCA+LASSO models fitted above. First we classified reviews based on majority vote of the classifications assigned by each individual model (i.e. the mode of the predictions, similar to the approach used by RandomForest). This resulted in a prediction error of`r ensemble.prediction.error` - far worse than our best fitting model (LASSO). Next, we used each model to calculate the probability of a rating being 4 or above, averaged the probabilities across models, and used this average to classify based on a majority vote (threshold at probability >0.5). This improved our testing error to `r en.prob.testerror`. Finally, we ran the same calculation but without including the probability predicted by our lowest-performing model (logistic regression, testing error = `r testerror.glm`), resulting in a testing error of `r prob.noglm.testerror` for our final ensemble model.
 
 ## 7. Final model
 
@@ -673,21 +673,11 @@ df.testerr <- data.frame(model=c('PCA+LASSO', 'RandomForest', 'LogisticReg', 'LA
 df.testerr[which.min(df.testerr$test.err),] #return model with lowest testing error
 ```
 
-The model that seems to produce the lowest testing error is the LASSO model. This is not terribly surprising, as LASSO selects the most important words to use in making its prediction. The performance of LASSO is not that far off from Random Forest's, though it is a bit surprising that RF did not perform better. Perhaps using many more trees would improve our performance to the extent that it surpasses LASSO. It is also not terribly surprising that applying PCA first in fact only makes the prediction slightly worse, since PCA needs almost as many components as variables to explain a reasonable amount of variance. It seems PCA may not be well suited for this particular data. The poor performance of the ensemble was surprising, which may be due to the mixing in of a poor model, or perhaps majority vote implementation. 
+Our Final Model: Average Probability Ensemble of LASSO, RandomForest, and PCA+LASSO
 
-Our Final Model: LASSO
-```{r}
-summary(fit.glm) # same as LASSO with lambda.1se
-```
-
+The model that produces the lowest testing error is the final ensemble model (majority vote classification based on probabilities averaged from LASSO, RandomForest, and PCA+LASSO). This is not terribly surprising, as the ensemble approach is able to minimize variance by averaging probabilities from our highest-performing models. However, this approach lacks interpretability and only slightly improves testing error beyond that of our LASSO model. 
 
 ```{r}
-# lasso
-lasso.validation.prediction <- predict(fit.lasso, as.matrix(data2.validation[, -1]), type = "class", s="lambda.1se") 
-lasso.validation.error <- mean(data2.validation$rating != lasso.validation.prediction)
-lasso.validation.error
-
-# EnProbReduced
 # first apply PC loadings from train to validation data for PC+LASSO prediction
 pc.val <- predict(pc.terms, data2.validation[,-1])
 # calculate average probabilities for validation data 
@@ -701,14 +691,15 @@ df.prob.val <- df.prob.val %>%
 prob.validation.error <- mean(data2.validation$rating != df.prob.val$en.class.noglm) # test error on validation data
 ```
 
-The validation error for our final model (LASSO) is `lasso.validation.error`. 
+The validation error for our final model is `prob.validation.error`. 
 
--FEEL FREE TO EXPAND OR GO INTO DETAIL-
-Were we tasked with making a prediction with this model, given a review, we would do the following:
+Were we tasked with making a prediction with this model, given a review, we would extract a dtm and then apply our classification model much as we did with the validation dataset. Specifically, we would:
 1. Process the text. This involves cleaning procedures such as removing punctuation, stem words, etc. 
 2. Generate word counts for each word that appears in the review as a data.frame.  
 3. Order the words as appears in the data.frame we used to train our model. 
 4. Convert this data frame to a 1D matrix. 
-5. Feed it as input to the predict() function, using our fit.lasso as the model, with type='class', s='lambda.1se'. 
-
+5. Predict probability of a positive rating on our LASSO model by feeding the dtm as input to the predict() function, using our fit.lasso as the model, with type='response', s='lambda.1se'. 
+6. Predict probability of a positive rating on our Random Forest model by feeding the dtm as input to the predict() function, using our rf.fit.final as the model, with type='prob'. 
+7. Predict probability of a positive rating on our PCA+LASSO model by applying our PC loadings to the dtm using predict() and then feeding the first 100 PCs to the predict() function, using our fit.lasso as the model, with type='response', s='lambda.1se'.
+8. Average the predicted probabilities from steps 5-7 and classify the review based on majority vote (e.g. assign a "good" rating of 4-5 stars if probability >0.5, else assign a "bad" rating of 1-3 stars)
 
