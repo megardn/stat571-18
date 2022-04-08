@@ -228,7 +228,7 @@ df_full$ASVAB_PC1 <- ASVAB_pca$x[,"PC1"]
 df_full$ASVAB_PC2 <- ASVAB_pca$x[,"PC2"]
 
 # label last row as Michelle once again (this time with the PCs)
-Michelle <- tail(df_full, n = 1)
+# Michelle <- tail(df_full, n = 1)
 
 
 ```
@@ -279,7 +279,7 @@ summary(fit2)
 anova(fit1, fit2)
 ```
 
-Based on the models above, we note that Gender does have a significant effect on log_income. Specifically, males tend to earn 10.097 + 0.09 more log_income compared to females (reference level).  
+**Answer:** Based on the models above, we note that Gender does have a significant effect on log_income. Specifically, males tend to earn 10.097 + 0.09 more log_income compared to females (reference level).  
 
 We next build a few models for the purpose of prediction using all the information available. From now on you may use the three data sets setting (training/testing/validation) when it is appropriate. 
 
@@ -289,7 +289,7 @@ i. fit1: tree(Income ~ Educ + Gender, data.train) with default set up
 
     a) Display the tree
   
-    ```{r}
+```{r}
 # fit the tree
 fit1 <- tree(log_income ~ Educ + Gender, data.train)
 
@@ -310,26 +310,26 @@ text(fit1)
 
     c) Does it show interaction effect of Gender and Educ over Income?
     
-**Answer"** Yes, the tree shows an interaction between gender and income, where being male with more than 15.5 years of education corresponds to the highest log_income, and conversely being female with less than 15.5 years of education is associated with the lowest log_income. 
+**Answer:** Yes, the tree shows an interaction between gender and income, where being male with more than 15.5 years of education corresponds to the highest log_income, and conversely being female with less than 15.5 years of education is associated with the lowest log_income. 
 
     d) Predict Michelle's income
 
 ```{r}
 
 fit.Michelle <- predict(fit1, Michelle)
-fit.Michelle # the fitted salary in log scale is 6.196343 (may not be the same each time we run the rf, why?)
+fit.Michelle # the fitted salary in log scale 
 
 Michelle_pred_income <- exp(fit.Michelle)
 
 ```
 
-**Answer"** Michelle's predicted log_income is `r fit.Michelle`, which corresponds to $ `r Mihcelle_pred_income`. 
+**Answer:** Michelle's predicted log_income is `r round(fit.Michelle,3)`, which corresponds to $ `r round(Michelle_pred_income,3)`. 
 
 ii. fit2: fit2 <- rpart(Income2005 ~., data.train, minsplit=20, cp=.009)
 
     a) Display the tree using plot(as.party(fit2), main="Final Tree with Rpart") 
     
-```{r}
+```{r, fig.width=9, fig.height=7}
 
 # fit tree using rpart
 fit2 <- rpart(log_income ~., data.train, minsplit = 20, cp = .009)
@@ -341,7 +341,7 @@ plot(as.party(fit2), main = "Final Tree with Rpart")
 
     b) A brief summary of the fit2
 
-This full tree inclusing all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith), years of education and Esteem10. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. 
+**Answer:** This full tree inclusing all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith), years of education and Esteem10. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. **INCLUDE ASVAB PC1 and PC2?**
 
     c) Compare testing errors between fit1 and fit2. Is the training error from fit2 always less than that from fit1? Is the testing error from fit2 always smaller than that from fit1? 
     
@@ -404,7 +404,7 @@ print(paste("cp = 0.0091: ", round(sum((predict(fit2.p6, data.test) - data.test$
   
 **Answer:** As it turns out, while cp = 0.009 has the smallest training error, cp = 0.011 has the smallest testing error. Thus, let's build the pruned tree using this criterion: 
 
-```{r}
+```{r, fig.width=9, fig.height=7}
 # summary(fit2.pruned)
 data.table(fit2.p5$frame)
 
@@ -425,7 +425,7 @@ iii. fit3: bag two trees
     a) Take 2 bootstrap training samples and build two trees using the 
     rpart(Income2005 ~., data.train.b, minsplit=20, cp=.009). Display both trees.
     
-```{r}
+```{r, fig.width=9, fig.height=7}
 
 # bootstrap tree 1 
 par(mfrow=c(1, 2))
@@ -494,16 +494,135 @@ print(paste("fit3 testing error: ", round(mse_oob, 3)))
 iv. fit4: Build a best possible RandomForest
 
     a) Show the process how you tune mtry and number of trees. Give a very high level explanation how fit4 is built.
-    b) Compare the oob errors form fit4 to the testing errors using your testing data. Are you convinced that oob errors estimate testing error reasonably well.
+    
+```{r}
+# tune ntree
+fit4 <- randomForest(log_income ~., data.train, mtry = 5, ntree = 500)    # change ntree
+plot(fit4, col = "red", pch = 16, type = "p", 
+     main="Tuning the number of trees")
+
+# tune mtry
+fit4.error.p <- 1:20  # set up a vector of length 20
+for (p in 1:20)  # repeat the following code inside { } 20 times
+{
+  fit4 <- randomForest(log_income ~., data.train, mtry = p, ntree = 200) # loop over p from 1 to 20
+  #plot(fit.rf, col= p, lwd = 3)
+  fit4.error.p[p] <- fit4$mse[200]  # collecting oob mse based on 250 trees
+}
+# fit4.error.p   # oob mse returned: should be a vector of 20
+
+plot(1:20, fit4.error.p, pch = 16,
+     main = "Testing errors of mtry with 200 trees",
+     xlab="mtry",
+     ylab="OOB mse of mtry")
+lines(1:20, fit4.error.p)
+
+# final model (ntree = 200, mtry = 5)
+fit4.final <- randomForest(log_income ~., data.train, mtry = 5, ntree = 200)
+plot(fit4.final)
+
+```
+
+**Answer:** 
+
+* First, we start by defining the optimal number of trees to be built (`ntree`). based on the first plot ("Tuning the number of trees"), we determine that 200 is likely a sufficient number of trees to have low OOB testing errors
+* Next, we fix `ntree` = 200 and proceed with tuning `mtry`, which is the number of predictors, by looping and generating random forests for 1 up to 20 included predictors. We then plot the `OOB mse[200]` to compare them and find the best `mtry`. Based on the second plot ("Testing error of mtry with 200 trees"), it seems that the best number of predictors is around 4-6, which matches the generally recommended number of predictors (`mtry` = p/3 = 20/3 = 6.6). 
+* The final fit4 model is thus built using `ntree = 200` and `mtry = 6`.
+
+
+    b) Compare the oob errors from fit4 to the testing errors using your testing data. Are you convinced that oob errors estimate testing error reasonably well.
+    
+
+```{r}
+
+# generate the testing errors
+fit4.final.testing <- randomForest(log_income ~., data.train, xtest = data.test[, -20],
+                          ytest = data.test[,20], mtry = 5, ntree = 200)
+head(fit4.final.testing$mse)
+
+# plotting the OOB errors and testing errors together
+plot(1:200, fit4.final.testing$mse, col = "red", pch = 16,
+     xlab = "number of trees",
+     ylab = "mse",
+     main = "mse's of RF: blue = OOB errors, red = testing errors")
+points(1:200, fit4.final$mse, col = "blue", pch = 16)
+
+```
+
+
+**Answer:** Overall, testing error using the test data is very similar to the error obtained using OOB. Thus, OOB errors estimate the testing error reasonably well. 
+
+
     c) What is the predicted value for Michelle?
 
-    
+
+```{r}
+
+fit4.final.Michelle <- predict(fit4.final, Michelle)
+Michelle.fit.4_pred_income <- exp(fit4.final.Michelle)
+
+```
+
+**Answer:** Michelle's predicted log_income is `r fit4.final.Michelle`, which corresponds to $ `r Michelle.fit.4_pred_income`. 
+
+   
 v. Now you have built so many predicted models (fit1 through fit4 in this section). What about build a fit5 which bags fit1 through fit4. Does fit5 have the smallest testing error?
+
+```{r}
+# creating fit 5 by bagging fit1-4
+fit5 <- (predict(fit1, data.train) + predict(fit2, data.train) + predict(fit3, data.train) + predict(fit4.final, data.train))/4 #bagging
+
+# show testing error from all created trees
+# fit1
+fit1.mse_oob <- mean((data.test$log_income - predict(fit1, data.test))^2)
+print(paste("fit1 testing error: ", round(fit1.mse_oob, 3)))
+# fit2
+fit2.mse_oob <- mean((data.test$log_income - predict(fit2.p5, data.test))^2)
+print(paste("fit2 testing error: ", round(fit2.mse_oob, 3)))
+# fit3
+fit3.mse_oob <- mean((data.test$log_income - predict(fit3, data.test))^2)
+print(paste("fit3 testing error: ", round(fit3.mse_oob, 3)))
+# fit4
+fit4.mse_oob <- mean((data.test$log_income - predict(fit4.final, data.test))^2)
+print(paste("fit4 testing error: ", round(fit4.mse_oob, 3)))
+# fit5 (bagged tree)
+fit5.mse_oob <- mean((data.test$log_income - fit5)^2)
+print(paste("fit5 testing error: ", round(fit5.mse_oob, 3)))
+
+# NB: RSS (residual sum of squares) is a part of MSE (mean squared error): MSE = RSS/ degree of freedom. Essentially for RSS we do sum() and for MSE we do mean()
+
+```
+
+**Answer:** fit5 has the largest testing error. **CHECK THIS - this seems really odd??**
+
 
 vi.  Summarize the results and nail down one best possible final model you will recommend to predict income. Explain briefly why this is the best choice. Finally for the first time evaluate the prediction error using the validating data set. 
 
+```{r}
+
+# prediction error using validation data
+fit4.mse_oob_validation <- mean((data.val$log_income - predict(fit4.final, data.val))^2)
+print(paste("fit4 prediction error using the validation data set: ", round(fit4.mse_oob_validation, 3)))
+
+# show variables used in the random forest model
+vars <- fit4.final$importance[,1, drop = FALSE]
+row.names(vars)
+
+```
+
+
+**Answer:** Based on the testing errors shown above, fit4.final is the best model to predict income because it has the smallest testing error. The prediction error using the validation data set is even lower (`r fit4.mse_oob_validation`), confirming that this is a good model for the prediction of log income. **Anything to add to this analysis? Just chose based on smallest error but is there some other thing that needs to be done?**
+
+
 vii. Use your final model to predict Michelle's income. 
 
+```{r}
+fit4.final.Michelle <- predict(fit4.final, Michelle)
+Michelle.fit.4_pred_income <- exp(fit4.final.Michelle)
+
+```
+
+**Answer:** Michelle's predicted log_income is `r fit4.final.Michelle`, which corresponds to $ `r Michelle.fit.4_pred_income`. **This is essentially the same thing as already outputted for fit4.final - is there anything else they want us to do here?**
 
     
 # Problem 2: Yelp challenge 2019
