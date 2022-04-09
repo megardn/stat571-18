@@ -169,7 +169,7 @@ df_full <- df_full %>%
          log_income = log(Income2005)
   )  %>%
   # remove ID, original income variable and Esteem variables as these should not be used as predictors
-  select(-c(Subject, Income2005), -contains(c("Esteem")))
+  dplyr::select(-c(Subject, Income2005), -contains(c("Esteem")))
 
 # label last row as Michelle
 Michelle <- tail(df_full, n = 1)
