@@ -445,7 +445,7 @@ good.glm <- good.glm[-1] %>% #remove intercept
 good.glm[1:2] #leading 2 words
 ```
 
-Among all the words used in the sampled reviews, "thorough" and "delight" are most predictive of a high rating. For each time that "thorough" or "delight" are used in a review, the log(odds) of the rating being 4 or 5 stars increases by about 2.5487 and 1.6607, respectively. 
+Among all the words used in the sampled reviews, "thorough" and "delight" are most predictive of a high rating. For each time that "thorough" or "delight" are used in a review, the log(odds) of the rating being 4 or 5 stars increases by about `r as.numeric(good.glm[1])` and `r as.numeric(good.glm[2])`, respectively.
 
 b) Make a word cloud with the top 100 positive words according to their coefficients. Interpret the cloud briefly.
 
@@ -454,7 +454,7 @@ cor.special <- brewer.pal(8,"Dark2")  #set color scheme
 wordcloud(names(good.glm[1:100]), good.glm[1:100],  # make a word cloud
           colors=cor.special, ordered.colors=F)
 ```
-Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", "goto", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "never worry" or similar. 
+Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "never worry" or similar. 
 
 c) Repeat i) and ii) for the bag of negative words.
 
@@ -465,7 +465,7 @@ bad.glm <-sort(-bad.glm, decreasing = TRUE) %>%
 bad.glm[1:2] #leading 2 words
 ```
 
-Out of all words stems to appear in the reviews, "wors" and "rude" are most predictive of a low (3 or fewer star) rating. For each time that "wors" or "rude" are used in a review, the log(odds) of the rating being 4 or 5 stars decreases by about 2.4189 and 2.1739, respectively. 
+Out of all words stems to appear in the reviews, "wors" and "rude" are most predictive of a low (3 or fewer star) rating. For each time that "wors" or "rude" are used in a review, the log(odds) of the rating being 4 or 5 stars decreases by about `r as.numeric(bad.glm[1])` and `r as.numeric(bad.glm[2])`, respectively.
 
 ```{r, message=FALSE, warning=FALSE, results= TRUE}
 wordcloud(names(bad.glm[1:100]), bad.glm[1:100],  # make a word cloud
@@ -571,11 +571,9 @@ set.seed(1)
 # using sparse matrix (terms appear in at least 0.5% reviews)
 terms.df <- data2.train[,-1] #remove rating
 pc.terms<- prcomp(terms.df, scale=TRUE)
-#save(pc.terms, file = "data/terms_prcomp.Rdata") too big! pair down and resave so it'll fit on github
 ```
 
 ```{r}
-#load("data/terms_prcomp.Rdata")
 pc.loading <- pc.terms$rotation[,1:50]
 knitr::kable(pc.loading) #look at loadings for top 50 PCs
 
