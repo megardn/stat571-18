@@ -7,7 +7,7 @@ author:
 date: 'Due: 11:59Pm,  4/10, 2022'
 output:
   html_document:
-    code_folding: show
+    code_folding: hide
     highlight: haddock
     theme: lumen
     toc: yes
@@ -25,8 +25,8 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F, echo=F)
 if (!require("pacman")) install.packages("pacman")
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, skimr, car, data.table, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel, tidyselect, report)
 
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel, tidyselect, report)
 ```
 
 
@@ -154,6 +154,51 @@ Variable Related to Life Success in 2006
   - validation data: only used in your final model to report the accuracy. 
 
 
+```{r}
+# load data
+df_full <- read.csv("data/IQ.Full.csv")
+
+# data cleaning
+df_full <- df_full %>% 
+  # seet categorical variables as factors
+  mutate(Race = as.factor(Race), 
+         Gender = as.factor(Gender),
+         Imagazine = as.factor(Imagazine),
+         Inewspaper = as.factor(Inewspaper),
+         Ilibrary = as.factor(Ilibrary),
+         log_income = log(Income2005)
+  )  %>%
+  # remove ID, original income variable and Esteem variables as these should not be used as predictors
+  select(-c(Subject, Income2005), -contains(c("Esteem")))
+
+# label last row as Michelle
+Michelle <- tail(df_full, n = 1)
+
+# remove the last row
+df <- df_full %>%
+  filter(row_number() <= n() - 1)
+
+skim(df)
+
+# split data into training, testing and validation
+N <- dim(df)[1]
+n1 <- floor(.7*N) # training = 70%
+n2 <- floor(.2*N) # testing = 20%
+
+set.seed(10)
+
+# Split data to three portions of 70%/20%/10% of data size N
+idx_train <- sample(N, n1)
+idx_no_train <- (which(! seq(1:N) %in% idx_train))
+idx_test <- sample(idx_no_train, n2)
+idx_val <- which(! idx_no_train %in% idx_test)
+data.train <- as.data.frame(df[idx_train,])
+data.test <- as.data.frame(df[idx_test,])
+data.val <- as.data.frame(df[idx_val,])
+
+```
+
+
 ## 2. Factors affect Income
 
 We only use linear models to answer the questions below.
@@ -161,10 +206,80 @@ We only use linear models to answer the questions below.
 i. To summarize ASVAB test scores, create PC1 and PC2 of 10 scores of ASVAB tests and label them as
 ASVAB_PC1 and ASVAB_PC2. Give a quick interpretation of each ASVAB_PC1 and ASVAB_PC2 in terms of the original 10 tests. 
 
+```{r}
+
+# create ASVAB subset
+ASVAB <- df[, 10:19]
+
+# apply PCA with scaling and centering
+ASVAB_pca <- prcomp(ASVAB, scale. = TRUE, center = TRUE)
+
+# display the loadings
+ASVAB_pca$rotation
+
+# add PC1 and PC2 to the df
+# df_pcs <- df
+df$ASVAB_PC1 <- ASVAB_pca$x[,"PC1"]
+df$ASVAB_PC2 <- ASVAB_pca$x[,"PC2"]
+
+# # redo the same for the full dataset and reselect Michelle's row (having PC1 and PC2 for Michelle is necessary for the tree section below)
+# ASVAB <- df_full[, 10:19]
+# ASVAB_pca <- prcomp(ASVAB, scale. = TRUE, center = TRUE)
+# df_full$ASVAB_PC1 <- ASVAB_pca$x[,"PC1"]
+# df_full$ASVAB_PC2 <- ASVAB_pca$x[,"PC2"]
+# 
+# # label last row as Michelle once again (this time with the PCs)
+# # Michelle <- tail(df_full, n = 1)
+
+```
+
+
+**Interpretation:** 
+
+* ASVAB_PC1 appears to be a weighted sum of all 10 items and can thus be interpreted as a general ASVAB score. 
+* ASVAB_PC2 appears to capture the difference between performance in more abstract reasoning (Arith, Word, Parag, Numer, Coding, Math) vs more applied tasks (Science, Auto, Mechanic, Elec). 
+
 ii. Is there any evidence showing ASVAB test scores in terms of ASVAB_PC1 and ASVAB_PC2, might affect the Income?  Show your work here. You may control a few other variables, including gender. 
+
+```{r}
+
+# let's start with a simple linear model
+fit1 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2, data = df)
+summary(fit1)
+
+fit2 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender, data = df)
+summary(fit2)
+
+fit3 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Race, data = df)
+Anova(fit3)
+
+fit4 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Educ, data = df)
+summary(fit4)
+
+fit5 <- lm(log_income ~ ASVAB_PC1 + ASVAB_PC2 + Gender + Educ + MotherEd + FatherEd, data = df)
+summary(fit5)
+```
+
+**Answer:** Based on the linear models above, the following observations can be made: 
+
+* ASVAB_PC1 and ASVAB_PC2 both have a significant effect on log_outcome, where having a higher score on either PC is associated with higher income. 
+* Gender has a significant effect, with males earning a higher income compared to females. 
+* Years of education have a significant effect on log_income, where higher years of education for the individual or their father is associated with higher log_income. 
+* Race or years of the mother's or father's education do not significantly impact log_income.
 
 iii. Is there any evidence to show that there is gender bias against either male or female in terms of income in the above model? 
 
+```{r}
+
+# display results of model fit including Gender
+Anova(fit2)
+summary(fit2)
+
+# testing the difference between the reduced model (without Gender) and full model (including Gender)
+anova(fit1, fit2)
+```
+
+**Answer:** Based on the models above, we note that Gender does have a significant effect on log_income. Specifically, males tend to earn 10.097 + 0.67 more log_income compared to females (reference level).  
 
 We next build a few models for the purpose of prediction using all the information available. From now on you may use the three data sets setting (training/testing/validation) when it is appropriate. 
 
@@ -173,37 +288,382 @@ We next build a few models for the purpose of prediction using all the informati
 i. fit1: tree(Income ~ Educ + Gender, data.train) with default set up 
 
     a) Display the tree
-    b) How many end nodes? Briefly explain how the estimation is obtained in each end nodes and deescribe the prediction equation
+  
+```{r}
+# fit the tree
+fit1 <- tree(log_income ~ Educ + Gender, data.train)
+
+# view numerical output
+summary(fit1)
+
+# plot the tree
+plot(fit1)
+title(main="log_income ~ Educ + Gender")
+text(fit1)
+
+```
+
+    
+    b) How many end nodes? Briefly explain how the estimation is obtained in each end nodes and describe the prediction equation
+    
+**Answer:** The tree has 4 end nodes, meaning that Gender and Education are partitioned into 4 boxes. The end node estimations correspond to the sample mean log_income for every end node. The prediction equation for this model is as follows: 
+
+* If gender == Female and years of education less than 15.5, the average log_income is 9.941
+* If gender == Female and years of education more than 15.5, the average log_income is 10.410
+* If gender == Male and years of education less than 15.5, the average log_income is 10.530
+* If gender == Male and years of education more than 15.5, the average log_income is 11.170
+
     c) Does it show interaction effect of Gender and Educ over Income?
+    
+**Answer:** Yes, the tree shows an interaction between gender and income, where being male with more than 15.5 years of education corresponds to the highest log_income, and conversely being female with less than 15.5 years of education is associated with the lowest log_income. 
+
     d) Predict Michelle's income
+
+```{r}
+
+# predict Michelle's log income based on fit1
+fit.Michelle <- predict(fit1, Michelle)
+# fit.Michelle # the fitted salary in log scale 
+data.frame(fitted=fit.Michelle,  obsy = Michelle["log_income"]) # compare with observed income for Michelle
+
+Michelle_pred_income <- exp(fit.Michelle) # get Michelle's income
+
+
+```
+
+**Answer:** Michelle's predicted log_income is `r round(fit.Michelle,3)`, which corresponds to $ `r round(Michelle_pred_income,3)`. 
 
 ii. fit2: fit2 <- rpart(Income2005 ~., data.train, minsplit=20, cp=.009)
 
     a) Display the tree using plot(as.party(fit2), main="Final Tree with Rpart") 
+    
+```{r, fig.width=9, fig.height=7}
+
+# fit tree using rpart
+fit2 <- rpart(log_income ~., data.train, minsplit = 20, cp = .009)
+
+# plot the rpart tree
+plot(as.party(fit2), main = "Final Tree with Rpart") 
+
+```
+
     b) A brief summary of the fit2
+
+**Answer:** This full tree inclusing all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith) and years of education. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. 
+
     c) Compare testing errors between fit1 and fit2. Is the training error from fit2 always less than that from fit1? Is the testing error from fit2 always smaller than that from fit1? 
+    
+```{r}
+
+# training error
+fit1.rss <- summary(fit1)$dev # fit1 RSS
+fit2.rss <- sum(residuals(fit2)^2) # fit2 RSS (fit2 has a different output as rpart was used)
+
+# testing error
+test.error.fit1 <- sum((predict(fit1, data.test) - data.test$log_income)^2)
+test.error.fit2 <- sum((predict(fit2, data.test) - data.test$log_income)^2)
+```
+
+**Answer:** The training error of fit2 (`r fit2.rss`) is smaller than the training error of fit1 (`r fit1.rss`). However, the testing error of fit2 (`r test.error.fit2`) is slightly larger than the testing error of fit1 (`r test.error.fit1`). While the training error always should be smaller for trees that include more variables, this does not necessarily hold true for the testing error, as this corresponds to the model fit on unseen data.
+
     d) You may prune the fit2 to get a tree with small testing error. 
     
+```{r}
+
+### testing a few pruning options ###
+
+# first print the cps of the rpart object
+# Note: cp = complexity parameter. Any split that does not decrease the overall lack of fit by a factor of cp is not attempted.
+printcp(fit2)
+plotcp(fit2) # plot the cps
+
+# find the option with the smallest error (in xerror)
+fit2$cptable[which.min(fit2$cptable[,"xerror"]),"CP"] # looks like 0.009 was already the optimal cp!
+
+# let's try several of these cp options on the test data to find their testing error 
+
+# cp = 0.07
+fit2.p1 <- prune(fit2, cp = 0.07)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.07: ", round(sum((predict(fit2.p1, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.033
+fit2.p2 <- prune(fit2, cp = 0.033)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.033: ", round(sum((predict(fit2.p2, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.02
+fit2.p3 <- prune(fit2, cp = 0.02)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.02: ", round(sum((predict(fit2.p3, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.014
+fit2.p4 <- prune(fit2, cp = 0.014)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.014: ", round(sum((predict(fit2.p4, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.011
+fit2.p5 <- prune(fit2, cp = 0.011)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.011: ", round(sum((predict(fit2.p5, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+# cp = 0.0091
+fit2.p6 <- prune(fit2, cp = 0.0091)  # prune fit2 using prune() from the rpart package (as the tree has been generated with rpart)
+print(paste("cp = 0.0091: ", round(sum((predict(fit2.p6, data.test) - data.test$log_income)^2), 3))) # testing error 
+
+```
+
+  
+**Answer:** As it turns out, while cp = 0.009 has the smallest training error, cp = 0.011 has the smallest testing error. Thus, let's build the pruned tree using this criterion: 
+
+```{r, fig.width=9, fig.height=7}
+# summary(fit2.pruned)
+data.table(fit2.p5$frame)
+
+#plot the best subtrees
+par(mfrow=c(1, 2))
+plot(fit2) # main tree
+title(main = "Main tree")
+text(fit2) # main tree
+plot(fit2.p5)
+title(main="Best pruned tree (cp = 0.011)")
+text(fit2.p5) # pruned tree
+
+```
+
+  
 iii. fit3: bag two trees
 
     a) Take 2 bootstrap training samples and build two trees using the 
     rpart(Income2005 ~., data.train.b, minsplit=20, cp=.009). Display both trees.
+    
+```{r, fig.width=9, fig.height=7}
+
+# bootstrap tree 1 
+par(mfrow=c(1, 2))
+n=nrow(data.train)
+set.seed(1)  
+index1 <- sample(n, n, replace = TRUE)
+df_b1 <- data.train[index1, ]  #  first bootstrap sample
+boot.1 <- rpart(log_income ~., df_b1, minsplit = 20, cp = .009) 
+plot(boot.1)
+title(main = "First bootstrap tree")
+text(boot.1, pretty = 0)
+
+# bootstrap tree 2 
+set.seed(2) # will be a different sample
+index1 <- sample(n, n, replace = TRUE)
+df_b2 <- data.train[index1, ]  # second bootstrap sample
+boot.2 <- rpart(log_income ~., df_b2, minsplit = 20, cp = .009) 
+plot(boot.2)
+title(main = "Second bootstrap tree")
+text(boot.2, pretty = 0)
+```
+
+
     b) Explain how to get fitted values for Michelle by bagging the two trees obtained above. Do not use the predict(). 
+    
+```{r eval=FALSE}
+
+# Normally, we would bag the two trees by averaging the two fitted equations and predict() the response for Michelle as follows
+# fit.bag.predict <- (predict(boot.1, Michelle) + predict(boot.2, Michelle))/2 #bagging
+# data.frame(fitted=fit.bag.predict,  obsy = Michelle["log_income"])
+
+# Alternatively, bagging can also be done using a randomforest, by specifying that the number of trees = 2 and by using ALL 20 predictors (which is the equivalent of bagging and removes the randomness)
+# set.seed(1)
+# fit3 <- randomForest(log_income ~., data.train, mtry = 20, ntree = 2)
+# 
+# # predict Michelle based on the 2 bagged trees
+# fit.Michelle.2 <- predict(fit3, Michelle)
+# data.frame(fitted=fit.Michelle.2,  obsy = Michelle["log_income"])
+# 
+# # could potentially get Michelle by looking at the OOB for her - for that we need to add Michelle back into the data.train sample
+# set.seed(1)
+# data.train.Michelle <- rbind(data.train, Michelle)
+# fit3.wMichelle <- randomForest(log_income ~., data.train.Michelle, mtry = 20, ntree = 2)
+# fit3.wMichelle$predicted[1809]
+
+# The `randomForest()` function can be used as an alternative to get fitted values for Michelle based on two bagged trees above without using the predict function. More specifically, to do bagging of 2 trees, `ntree` has to be set to 2 and `mtry` has to be set to all included predictors (20 here), as this will lead to bagging instead of random tree building. Next, to get Michelle's fitted value without using predict(), we can add Michelle's data to the data.train sample and rerun the random forest. Her fitted log_income can then be extracted by selecting the last (newly added) row of `fit3.wMichelle$predicted[1809]`.
+```
+
+```{r}
+# show Michelle's relevant variables
+Michelle
+```
+
+**Answer:** Michelle's fitted values can be obtained without the predict() function by manually going through each tree node according to Michelle's data. To obtain the fitted values of the two bagged trees, we than compute the average of the fitted values corresponding to Michelle's category.
+Thus: 
+
+* Manually find the boot.1 fitted value for Michelle: 
+  + Arith is 9 < 15.5
+  + MotherEd is 9 < 9.5
+  + Numer is 24 < 36.5
+  + Coding is 27 < 40.5
+  
+  According to boot.1, Michelle has a predicted log_income of 9.545
+
+* Manually find the boot.2 fitted value for Michelle: 
+  + Gender == Female
+  + Education is 13 < 17.5
+  + Elec is 9 > 7.5
+  
+  According to boot.2, Michelle has a predicted log_income of 10.1
+  
+* Average the 2 fitted values to get Michelle's bagged fitted log_income: `r (9.545 + 10.1) / 2`
+
+
     c) What is the testing error for the bagged tree. Is it guaranteed that the testing error by bagging the two tree always smaller that either single tree? 
+    
+```{r}
+# getting bagged tree testing error
+fit3 <- as.vector((predict(boot.1, data.train) + predict(boot.2, data.train))/2) #bagging
+mse <- mean((data.test$log_income - fit3)^2, na.rm = TRUE) # there are some NAs in the predicted values
+
+print(paste("fit3 testing error: ", round(mse, 3)))
+```
+
+**Answer:** While generally bagging two trees will very likely tend to reduce the testing error, this does not necessarily hold rue when bbagging just two trees. More specifically, if one of the trees happen to have a large testing error, the resulting bagged testing error will be afffected and may be larger than the testing error of the "better" other input tree. 
+
     
 iv. fit4: Build a best possible RandomForest
 
     a) Show the process how you tune mtry and number of trees. Give a very high level explanation how fit4 is built.
-    b) Compare the oob errors form fit4 to the testing errors using your testing data. Are you convinced that oob errors estimate testing error reasonably well.
+    
+```{r}
+# tune ntree
+fit4 <- randomForest(log_income ~., data.train, mtry = 5, ntree = 500)    # change ntree
+plot(fit4, col = "red", pch = 16, type = "p", 
+     main="Tuning the number of trees")
+
+# tune mtry
+fit4.error.p <- 1:20  # set up a vector of length 20
+for (p in 1:20)  # repeat the following code inside { } 20 times
+{
+  fit4 <- randomForest(log_income ~., data.train, mtry = p, ntree = 200) # loop over p from 1 to 20
+  #plot(fit.rf, col= p, lwd = 3)
+  fit4.error.p[p] <- fit4$mse[200]  # collecting oob mse based on 250 trees
+}
+# fit4.error.p   # oob mse returned: should be a vector of 20
+
+plot(1:20, fit4.error.p, pch = 16,
+     main = "Testing errors of mtry with 200 trees",
+     xlab="mtry",
+     ylab="OOB mse of mtry")
+lines(1:20, fit4.error.p)
+
+# final model (ntree = 200, mtry = 5)
+fit4.final <- randomForest(log_income ~., data.train, mtry = 6, ntree = 200)
+plot(fit4.final)
+
+```
+
+**Answer:** 
+
+* First, we start by defining the optimal number of trees to be built (`ntree`). based on the first plot ("Tuning the number of trees"), we determine that 200 is likely a sufficient number of trees to have low OOB testing errors
+* Next, we fix `ntree` = 200 and proceed with tuning `mtry`, which is the number of predictors, by looping and generating random forests for 1 up to 20 included predictors. We then plot the `OOB mse[200]` to compare them and find the best `mtry`. Based on the second plot ("Testing error of mtry with 200 trees"), it seems that the best number of predictors is around 4-6, which matches the generally recommended number of predictors (`mtry` = p/3 = 20/3 = 6.6). 
+* The final fit4 model is thus built using `ntree = 200` and `mtry = 6`.
+
+
+    b) Compare the oob errors from fit4 to the testing errors using your testing data. Are you convinced that oob errors estimate testing error reasonably well.
+    
+
+```{r}
+
+# generate the testing errors
+fit4.final.testing <- randomForest(log_income ~., data.train, xtest = data.test[, -20],
+                          ytest = data.test[,20], mtry = 5, ntree = 200)
+head(fit4.final.testing$mse)
+
+# plotting the OOB errors and testing errors together
+plot(1:200, fit4.final.testing$mse, col = "red", pch = 16,
+     xlab = "number of trees",
+     ylab = "mse",
+     main = "mse's of RF: blue = OOB errors, red = testing errors")
+points(1:200, fit4.final$mse, col = "blue", pch = 16)
+
+```
+
+
+**Answer:** Overall, testing error using the test data is very similar to the error obtained using OOB. Thus, OOB errors estimate the testing error reasonably well. 
+
+
     c) What is the predicted value for Michelle?
 
-    
+
+```{r}
+# generating predicted value for Michelle based on fit4.final
+fit4.final.Michelle <- predict(fit4.final, Michelle)
+data.frame(fitted=fit.Michelle,  obsy = Michelle["log_income"]) # compare with observed income for Michelle
+Michelle.fit.4_pred_income <- exp(fit4.final.Michelle)
+
+```
+
+**Answer:** Michelle's predicted log_income is `r fit4.final.Michelle`, which corresponds to $ `r Michelle.fit.4_pred_income`. 
+
+   
 v. Now you have built so many predicted models (fit1 through fit4 in this section). What about build a fit5 which bags fit1 through fit4. Does fit5 have the smallest testing error?
+
+```{r}
+# creating fit 5 by bagging fit1-4
+fit5 <- (predict(fit1, data.train) + predict(fit2, data.train) + fit3 + predict(fit4.final, data.train))/4 #bagging
+
+# show testing error from all created trees
+# fit1
+fit1.mse_oob <- mean((data.test$log_income - predict(fit1, data.test))^2)
+print(paste("fit1 testing error: ", round(fit1.mse_oob, 3)))
+# fit2
+fit2.mse_oob <- mean((data.test$log_income - predict(fit2.p5, data.test))^2)
+print(paste("fit2 testing error: ", round(fit2.mse_oob, 3)))
+# fit3
+fit3.mse_oob <- mean((data.test$log_income - fit3)^2)
+print(paste("fit3 testing error: ", round(fit3.mse_oob, 3)))
+# fit4
+fit4.mse_oob <- mean((data.test$log_income - predict(fit4.final, data.test))^2)
+print(paste("fit4 testing error: ", round(fit4.mse_oob, 3)))
+# fit5 (bagged tree)
+fit5.mse_oob <- mean((data.test$log_income - fit5)^2)
+print(paste("fit5 testing error: ", round(fit5.mse_oob, 3)))
+
+# NB: RSS (residual sum of squares) is a part of MSE (mean squared error): MSE = RSS/ degree of freedom. Essentially for RSS we do sum() and for MSE we do mean()
+
+```
+
+**Answer:** fit5 does not have the smallest testing error.
+
 
 vi.  Summarize the results and nail down one best possible final model you will recommend to predict income. Explain briefly why this is the best choice. Finally for the first time evaluate the prediction error using the validating data set. 
 
+```{r}
+
+# creating fit 6 by bagging fit1, 2 and 4 (exclude fit3 due to its high testing error)
+fit6 <- (predict(fit1, data.train) + predict(fit2, data.train) + predict(fit4.final, data.train))/3 #bagging
+
+# fit6 (bagged tree)
+fit6.mse_oob <- mean((data.test$log_income - fit6)^2)
+print(paste("fit5 testing error: ", round(fit6.mse_oob, 3)))
+
+# the testing error of fit6 is lower than fit5, but still doesn't beat fit4.final. Therefore, we'll stick with fit4 final as the best possible final model to predict log_outcome. 
+
+# prediction error using validation data
+fit4.mse_oob_validation <- mean((data.val$log_income - predict(fit4.final, data.val))^2)
+print(paste("fit4 prediction error using the validation data set: ", round(fit4.mse_oob_validation, 3)))
+
+# show variables used in the random forest model
+# vars <- fit4.final$importance[,1, drop = FALSE]
+# row.names(vars)
+
+```
+
+
+**Answer:** Based on the comparison of testing errors shown in the previous section (v), it appeared that fit5 had a larger testing error than fit1, fit2 and fit4.final. However, given that fit3 had the largest testing error overall and thus reflected a poor model fit, we created a fit6 tree by bagging fit1, fit2 and fit4.final, excluding fit3 to determine whether this would reduce the testing error. This changed the testing error from `r round(fit5.mse_oob, 3)` to `r round(fit6.mse_oob, 3)`, making it still larger than the error for fit4.final (`r  round(fit4.mse_oob, 3)`). Thus, we are keeping fit4.final as the best model to predict income because it has the smallest testing error. The prediction error using the validation data set is even lower (`r round(fit4.mse_oob_validation, 3)`), confirming that this is a good model for the prediction of log income.  
+
+
 vii. Use your final model to predict Michelle's income. 
 
+```{r}
+fit4.final.Michelle <- predict(fit4.final, Michelle)
+data.frame(fitted=fit.Michelle,  obsy = Michelle["log_income"]) # compare with observed income for Michelle
+
+Michelle.fit.4_pred_income <- exp(fit4.final.Michelle)
+
+```
+
+**Answer:** Michelle's predicted log_income is `r fit4.final.Michelle`, which corresponds to $ `r Michelle.fit.4_pred_income`.
 
     
 # Problem 2: Yelp challenge 2019
