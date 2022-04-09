@@ -23,9 +23,10 @@ urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F)
+knitr::opts_chunk$set(fig.height=4, fig.width=6, warning = F, echo=F)
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger)
+
+pacman::p_load(randomForest, tree, ISLR, rpart, rattle, pROC, partykit, ggplot2, glmnet, leaps, dplyr, keras, neuralnet, imager, ranger, tm, GGally, RColorBrewer, wordcloud, parallel, MASS, doParallel, tidyselect, report)
 ```
 
 
@@ -213,7 +214,7 @@ Yelp has made their data available to public and launched Yelp challenge. [More 
 
 For this case study, we downloaded the [data](https://www.yelp.com/dataset/download) and took a 20k subset from **review.json**. *json* is another format for data. It is flexible and commonly-used for websites. Each item/subject/sample is contained in a brace *{}*. Data is stored as **key-value** pairs inside the brace. *Key* is the counterpart of column name in *csv* and *value* is the content/data. Both *key* and *value* are quoted. Each pair is separated by a comma. The following is an example of one item/subject/sample.
 
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -225,7 +226,7 @@ For this case study, we downloaded the [data](https://www.yelp.com/dataset/downl
 
 **yelp_review_20k.json** contains full review text data including the user_id that wrote the review and the business_id the review is written for. Here's an example of one review.
 
-```{json}
+```{json, eval=FALSE}
 {
     // string, 22 character unique review id
     "review_id": "zdSx_SD6obEhz9VrW9uAWA",
@@ -269,7 +270,7 @@ The goals are
 i. Load *json* data
 
 The *json* data provided is formatted as newline delimited JSON (ndjson). It is relatively new and useful for streaming.
-```{json}
+```{json, eval=F}
 {
   "key1": "value1",
   "key2": "value2"
@@ -281,7 +282,7 @@ The *json* data provided is formatted as newline delimited JSON (ndjson). It is 
 ```
 
 The traditional JSON format is as follows.
-```{json}
+```{json, eval=F}
 [{
   "key1": "value1",
   "key2": "value2"
@@ -309,47 +310,252 @@ str(yelp_data)
 
 a) Which time period were the reviews collected in this data?
 
+```{r}
+yelp_data %>% 
+  summarise(start.date = as.Date(min(date)),
+            end.date = as.Date(max(date)))
+```
+The reviews were written between Oct. 19th, 2004 and Oct. 4th, 2018. 
+
 b) Are ratings (with 5 levels) related to month of the year or days of the week? Only address this through EDA please. 
 
+```{r}
+
+month.of.year <- months(as.Date(yelp_data$date)) # extract the months
+day.of.week <- weekdays(as.Date(yelp_data$date)) # extract the day
+
+print("Proportion Table: Days of Week - Within a Day")
+prop.table(table(yelp_data$stars, day.of.week), 2)  # create a proportion table for the weekdays (prop across cols, on day X what proportion were Y stars)
+print("Proportion Table: Days of Week - Within a Star")
+prop.table(table(yelp_data$stars, day.of.week), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X day)
+
+print("Proportion Table: Month of Year - Within a Month")
+prop.table(table(yelp_data$stars, month.of.year), 2)  # create a proportion table for the weekdays (prop across cols, on month X what proportion were Y starts)
+print("Proportion Table: Month of Year - Within a Star")
+prop.table(table(yelp_data$stars, month.of.year), 1)  # create a proportion table for the weekdays (prop across rows, of Y star reviews, what proportion were on X month)
+
+
+#messing around with plots
+days <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+yelp_data <- yelp_data %>% mutate(month=factor(months(as.Date(yelp_data$date)), levels=month.name),
+                     weekday=factor(weekdays(as.Date(yelp_data$date)), levels=days)) #adding month and weekday cols
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=month)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Month", fill="stars")
+
+ggplot(yelp_data, aes(fill=as.factor(stars), x=weekday)) + 
+  geom_bar(position="stack", stat="count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Ratings by Day of the Week", fill="stars")
+```
+
+It appears based on the above proportion tables that there is no major relationship between day of the week or month of the year and review score. 
 
 ii. Document term matrix (dtm)
  
  Extract document term matrix for texts to keep words appearing at least .5% of the time among all 20000 documents. Go through the similar process of cleansing as we did in the lecture. 
 
+```{r}
+just.text <- yelp_data$text # get just the review text
+full.corpus <- VCorpus(VectorSource(just.text)) # convert to corpus
+# create controls for data processing
+clist <- list(tolower = TRUE, 
+                    removePunctuation = TRUE,
+                    removeNumbers = TRUE, 
+                    stopwords = stopwords("english"), 
+                    stemming = TRUE)
+
+doc.term.matrix.full <- DocumentTermMatrix(full.corpus, control = clist) # create the matrix
+doc.term.matrix <- removeSparseTerms(doc.term.matrix.full, 1-.005)  # remove words that appear in fewer than 0.5 percent reviews
+inspect(doc.term.matrix)
+```
+
 a) Briefly explain what does this matrix record? What is the cell number at row 100 and column 405? What does it represent?
+
+This matrix records the amount of times that a particular word appears in a given review. 
+
+```{r}
+inspect(doc.term.matrix[100, 405])
+```
+
+At row 100, column 405, we have a number 0. This corresponds to the amount of times that a particular word (the word in column 405) appears in document 100. 
 
 b) What is the sparsity of the dtm obtained here? What does that mean?
 
+The sparsity of the matrix is 97% here, meaning that 97% of the elements are zero. This means that 97% of the time a given word does not appear in a given document. 
+
 iii. Set the stars as a two category response variable called rating to be “1” = 5,4 and “0”= 1,2,3. Combine the variable rating with the dtm as a data frame called data2. 
+
+```{r}
+# create rating variable
+rating <- yelp_data %>%
+  transmute(rating = as.factor(ifelse(stars == 5 | stars == 4, 1, 0)) )
+# make data2 with the dtm and rating
+data2 <- data.frame(rating, as.matrix(doc.term.matrix)) 
+head(data2)
+```
 
 ## Analysis
 
 Get a training data with 13000 reviews and the 5000 reserved as the testing data. Keep the rest (2000) as our validation data set. 
 
+```{r}
+set.seed(1) # for reproducibility
+train.idx <- sample(nrow(data2), 13000) # extract 13000 reviews to use as training data
+test.idx <- sample(seq(1, nrow(data2))[-train.idx], 5000) # extract 5000 reviews to use as testing data that were not in training data
+validation.idx <- sample(seq(1, nrow(data2))[-c(train.idx, test.idx)], nrow(data2) - 13000 - 5000) # extract remaining rows as validation data
+data2.test <- data2[test.idx,] # create test data
+data2.train <- data2[train.idx,] # create training data
+data2.validation <- data2[validation.idx,] # create validation data
+```
+
 ## 2. LASSO
 
 i. Use the training data to get Lasso fit. Choose lambda.1se. Keep the result here.
 
+```{r}
+Y <- data2.train[, 1] # extract Y
+X <- sparse.model.matrix(rating~., data=data2.train)[, -1] # get design matrix without the first col of 1's
+set.seed(1)  # to control the randomness in K folds 
+fit.lasso <- cv.glmnet(X, Y, alpha=1, nfolds=10, family="binomial")
+plot(fit.lasso) #plot lambdas
+
+coef.1se <- coef(fit.lasso, s="lambda.1se") #variables ID'd 
+lasso.words <- coef.1se@Dimnames[[1]] [coef.1se@i][-1] # non-zero variables without intercept. 
+```
+
 ii. Feed the output from Lasso above, get a logistic regression. 
-	
+
+```{r}
+sel_cols <- c("rating", lasso.words) #select y and LASSO variables
+data2.train_sub <- data2.train %>% dplyr::select(all_of(sel_cols)) #subset data
+fit.glm <- glm(rating~., family=binomial, data2.train_sub) #run glm
+```
+
 a) Pull out all the positive coefficients and the corresponding words. Rank the coefficients in a decreasing order. Report the leading 2 words and the coefficients. Describe briefly the interpretation for those two coefficients. 
+
+```{r}
+fit.glm.coef <-coef(fit.glm) #pull logistic coef
+good.glm <- fit.glm.coef[which(fit.glm.coef > 0)] #positive words
+good.glm <- good.glm[-1] %>% #remove intercept
+  sort(decreasing=TRUE) %>% #sort
+  round(4)
+good.glm[1:2] #leading 2 words
+```
+
+Among all the words used in the sampled reviews, "thorough" and "delight" are most predictive of a high rating. For each time that "thorough" or "delight" are used in a review, the log(odds) of the rating being 4 or 5 stars increases by about `r as.numeric(good.glm[1])` and `r as.numeric(good.glm[2])`, respectively.
 
 b) Make a word cloud with the top 100 positive words according to their coefficients. Interpret the cloud briefly.
 
+```{r, message=FALSE, warning=FALSE, results= TRUE}
+cor.special <- brewer.pal(8,"Dark2")  #set color scheme
+wordcloud(names(good.glm[1:100]), good.glm[1:100],  # make a word cloud
+          colors=cor.special, ordered.colors=F)
+```
+Each word displayed is predictive of a higher rating (4 or 5 stars), with size corresponding to the strength of that association. Many of these word stems ("pleasur", "delight", "comfort", etc.) have strong positive connotations. However, some stems, like "slight", "thursday", or "worri", are less intuitively positive, indicating that the associations identified by the model implicitly account for the context in which the stem appears. In other words, the model is able to identify "worri" as predicting positive ratings, suggesting that many positive reviews include phrases such as "no worries", "never worry" or similar. 
+
 c) Repeat i) and ii) for the bag of negative words.
+
+```{r}
+bad.glm <- fit.glm.coef[which(fit.glm.coef < 0)] #negative words
+bad.glm <-sort(-bad.glm, decreasing = TRUE) %>%
+  round(4)
+bad.glm[1:2] #leading 2 words
+```
+
+Out of all words stems to appear in the reviews, "wors" and "rude" are most predictive of a low (3 or fewer star) rating. For each time that "wors" or "rude" are used in a review, the log(odds) of the rating being 4 or 5 stars decreases by about `r as.numeric(bad.glm[1])` and `r as.numeric(bad.glm[2])`, respectively.
+
+```{r, message=FALSE, warning=FALSE, results= TRUE}
+wordcloud(names(bad.glm[1:100]), bad.glm[1:100],  # make a word cloud
+          colors=cor.special, ordered.colors=F)
+```
+
+The words most strongly predictive of a negative review are those that suggest unpleasant interactions and/or food quality, such as "rude", "terribl", "overcook" and "gross". Interestingly, both "woman" and "women" are identified as being associated with lower ratings; though further analysis would be necessary to determine the root of this association, it may reflect differing attitudes toward and expectations of women in customer service roles.
 
 d) Summarize the findings. 
 
 iii. Using majority votes find the testing errors
 	i) From Lasso fit in 3)
+```{r}
+predict.lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") #output majority vote labels
+testerror.lasso <- mean(data2.test$rating != predict.lasso) #testing error
+```
+
 	ii) From logistic regression in 4)
+```{r}
+predict.glm <- predict(fit.glm, data2.test, type = "response") #prediction for testing data
+class.glm <- ifelse(predict.glm > .5, "1", "0")
+
+testerror.glm <- mean(data2.test$rating != class.glm) #find prediction error for data.test
+```
+	
 	iii) Which one is smaller?
+	
+The testing error for the LASSO fit (`r mean(data2.test$rating != predict.lasso)`) is smaller than that of the logistic regression (`r testerror.glm`).
 
 ## 3. Random Forest  
 
 i. Briefly summarize the method of Random Forest
 
+Random Forest methods consist of leveraging multiple decision trees to solve classification or regression problems. Each tree is built recursively as a series of split-points, each optimized from among a set of variables to minimize misclassification error (for classification) or residual sum of squares (for regression). In Random Forest, some number of such decision trees are initialized, each using a subset of the available variables, and a bootstrapped sampled of the data. In the case of a regression problem, the aggregated output is typically an average of all predictions based on each decision tree. In the case of a classification problem, the aggregated output is typically a majority vote, based on the classification by each decision tree.
+
 ii. Now train the data using the training data set by RF. Get the testing error of majority vote. Also explain how you tune the tuning parameters (`mtry` and `ntree`). 
+
+```{r}
+set.seed(1) # for reproducibility
+# first we tune the parameters
+rf.fit1 <- randomForest(rating~., data2.train, mtry=6, ntree=250)
+plot(rf.fit1, main = "Testing Error by Number of Trees")
+legend("topright", colnames(rf.fit1$err.rate), col=1:3, cex=0.8, fill=1:3)
+```
+
+In order to tune the ntree parameter, we have plotted the Out of Bag classification error against the number of trees used, with mtry held constant. Based on this plot, 100-150 trees seem to be appropriate, as the decrease in error is negligible past this point. Accordingly, we opted to use 150 trees. 
+
+Now, we will focus on optimizing mtry. To do this, we will do randomForest over a range of mtry values, with ntree held constant, and plot the OOB classification error for each value. Because this process will be computationally expensive, I have run my code with parallel processing and saved the output to mse_mtry.Rdata, so as to not have to re-run this chunk. 
+
+```{r, eval=FALSE}
+#max.vars <- dim(data2.train)[2] - 1 # max number of variables (subtract 1 to account for the ratings variable)
+# this will take a LONG time on its own, so we'll implement parallel processing for our loop. 
+
+numCores <- detectCores() # detect the number of available cores. 
+cluster1 <- makeCluster(numCores-2, # number of cores to use, let's leave 1 core free
+                         type = "FORK") # type of cluster, FORK lets us use stuff already in session
+registerDoParallel(cluster1) # register our cluster 
+
+max.vars <- 60
+error.vector <- foreach(x = 1:max.vars, .combine = 'c') %dopar% {
+  temp.fit <- randomForest(rating~., data2.train, mtry=x, ntree=150)
+  temp.fit$err.rate[150,1]
+  }
+stopCluster(cluster1) # close the cluster
+
+save(error.vector, file = "mse_mtry.Rdata")
+```
+
+
+```{r}
+max.vars <- 60
+load("mse_mtry.Rdata")
+# plot the MSE
+plot(1:max.vars, error.vector, pch=16,
+     main = "OOB Classification Error, 150 Trees",
+     xlab="mtry parameter",
+     ylab="OOB Error")
+lines(1:max.vars, error.vector)
+```
+
+As we can see, the OOB classification error begins to plateau around 20 variables, so we can select this as our mtry. 
+
+```{r}
+rf.fit.final <- randomForest(rating~., data2.train, mtry=20, ntree=150) # fit the final random forest model
+rf.fit.final$err.rate[150, 1]
+
+predict.rf <- predict(rf.fit.final, data2.test)
+test.data.error <- mean(data2.test$rating != predict.rf) 
+```
+The testing error of majority vote is: `test.data.error`. 
 
 ## 4. Boosting - REMOVED
 
@@ -360,26 +566,138 @@ SECTION REMOVED
 
 i. Perform PCA (better to do sparse PCA) for the input matrix first. Decide how many PC's you may want to take and why.
 
-ii. Pick up one of your favorate method above and build the predictive model with PC's. Say you use RandomForest.
+```{r}
+set.seed(1)
+# using sparse matrix (terms appear in at least 0.5% reviews)
+terms.df <- data2.train[,-1] #remove rating
+pc.terms<- prcomp(terms.df, scale=TRUE)
+```
+
+```{r}
+pc.loading <- pc.terms$rotation[,1:50]
+knitr::kable(pc.loading) #look at loadings for top 50 PCs
+
+#scree plots
+plot(summary(pc.terms)$importance[2,], 
+     ylab="PVE",
+     xlab="Number of PC's",
+     pch = 16, 
+     main="Scree Plot of PVE")
+
+plot(summary(pc.terms)$importance[3, ], pch=16,
+     ylab="Cumulative PVE",
+     xlab="Number of PC's",
+     main="Scree Plot of Cumulative PVE")
+```
+
+Using 100 PCs based on scree plot.
+
+ii. Pick up one of your favorite method above and build the predictive model with PC's. Say you use RandomForest.
+
+Using relaxed LASSO since it had a smaller testing error on the original data.
+
+```{r}
+loadings.df <- data.frame(data2.train[, 1], pc.terms$x[,1:100]) %>% # add rating back
+  rename(rating = 1)
+
+Y <- loadings.df[, 1] 
+X <- sparse.model.matrix(rating~., data=loadings.df)[, -1] # get design matrix without the first col of 1's
+set.seed(1)  # to control the randomness in K folds 
+fit.pca <- cv.glmnet(X, Y, alpha=1, nfolds=10, family="binomial")
+plot(fit.pca) #plot lambdas
+
+pc.coef.1se <- coef(fit.pca, s="lambda.1se") #variables ID'd 
+pc.coef <- pc.coef.1se@Dimnames[[1]] [pc.coef.1se@i][-1] # non-zero variables without intercept
+```
 
 iii. What is the testing error? Is this testing error better than that obtained using the original x's? 
+
+```{r}
+pc.test <- predict(pc.terms, data2.test[,-1]) #apply PC loadings from train to test
+predict.pc.lasso <- predict(fit.pca, pc.test[,1:100], type = "class", s="lambda.1se") #output majority vote labels
+pc.test.er <- mean(data2.test$rating != predict.pc.lasso) #testing error
+```
+
+The testing error of the LASSO fit modeled using the 100 leading PCs is 0.1362, almost identical for the testing error of the LASSO fit on the original data (0.1342).
 
 ## 6. Ensemble model
 
 i. Take average of some of the  models built above (also try all of them) and this gives us the fifth model. Report it's testing error. (Do you have more models to be bagged, try it.)
 
+```{r}
+# create a function to find the mode. Taken from: https://stackoverflow.com/questions/2547402/how-to-find-the-statistical-mode
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# we'll use majority vote
+ensemble.model.predict.all <- data.frame(predict(fit.pca, pc.test[,1:100], type = "class", s="lambda.1se"),     # PCA + LASSO 
+                                predict(rf.fit.final, data2.test),                                              # Random Forest
+                                ifelse(predict(fit.glm, data2.test, type = "response") > .5, "1", "0"),         # Logistic Regression
+                                predict(fit.lasso, as.matrix(data2.test[, -1]), type = "class", s="lambda.1se") # LASSO 
+                           )
+ensemble.model.predict.vote <- apply(ensemble.model.predict.all, 2, FUN = Mode)
+ensemble.prediction.error <- mean(data2.test$rating != ensemble.model.predict.vote)
+ensemble.prediction.error
+
+# average probabilities
+df.prob <- data2.test %>% dplyr::select(rating) #initialize df to store outputs
+df.prob$pca <- predict(fit.pca, pc.test[,1:100], type = "response", s="lambda.1se") 
+df.prob$rf <- predict(rf.fit.final, data2.test, type="prob")[,2] 
+df.prob$glm <- predict(fit.glm, data2.test, type = "response") 
+df.prob$lasso <- predict(fit.lasso, as.matrix(data2.test[, -1]), type = "response", s="lambda.1se") 
+df.prob <- df.prob %>%
+  mutate(en.class = ifelse(rowMeans(df.prob[ , c(2:5)], na.rm=FALSE) > .5, "1", "0")) # majority rule classification based on averaged probabilities 
+en.prob.testerror <- mean(data2.test$rating != df.prob$en.class)
+
+# reduced ensemble - removing glm, since it has the worst testing error
+df.prob <- df.prob %>%
+  mutate(en.class.noglm = ifelse(rowMeans(df.prob[ , c("pca", "rf", "lasso")], na.rm=FALSE) > .5, "1", "0")) # majority rule classification based on averaged probabilities 
+prob.noglm.testerror <- mean(data2.test$rating != df.prob$en.class.noglm)
+```
+
+We created several ensemble models based on the Random Forest, LASSO, logistic regression, and PCA+LASSO models fitted above. First we classified reviews based on majority vote of the classifications assigned by each individual model (i.e. the mode of the predictions, similar to the approach used by RandomForest). This resulted in a prediction error of`r ensemble.prediction.error` - far worse than our best fitting model (LASSO). Next, we used each model to calculate the probability of a rating being 4 or above, averaged the probabilities across models, and used this average to classify based on a majority vote (threshold at probability >0.5). This improved our testing error to `r en.prob.testerror`. Finally, we ran the same calculation but without including the probability predicted by our lowest-performing model (logistic regression, testing error = `r testerror.glm`), resulting in a testing error of `r prob.noglm.testerror` for our final ensemble model.
 
 ## 7. Final model
 
 Which classifier(s) seem to produce the least testing error? Are you surprised? Report the final model and accompany the validation error. Once again this is THE only time you use the validation data set.  For the purpose of prediction, comment on how would you predict a rating if you are given a review (not a tm output) using our final model? 
 
+```{r}
+# create a table of all models' testing errors
+df.testerr <- data.frame(model=c('PCA+LASSO', 'RandomForest', 'LogisticReg', 'LASSO', 'EnMode', 'EnProb', 'EnProbReduced'),
+                 test.err=c(pc.test.er, test.data.error, testerror.glm, testerror.lasso, ensemble.prediction.error, en.prob.testerror, prob.noglm.testerror))
 
+df.testerr[which.min(df.testerr$test.err),] #return model with lowest testing error
+```
 
+Our Final Model: Average Probability Ensemble of LASSO, RandomForest, and PCA+LASSO
 
+The model that produces the lowest testing error is the final ensemble model (majority vote classification based on probabilities averaged from LASSO, RandomForest, and PCA+LASSO). This is not terribly surprising, as the ensemble approach is able to minimize variance by averaging probabilities from our highest-performing models. However, this approach lacks interpretability and only slightly improves testing error beyond that of our LASSO model. 
 
+```{r}
+# first apply PC loadings from train to validation data for PC+LASSO prediction
+pc.val <- predict(pc.terms, data2.validation[,-1])
+# calculate average probabilities for validation data 
+df.prob.val <- data2.validation %>% dplyr::select(rating) #initialize df to store outputs
+df.prob.val$pca <- predict(fit.pca, pc.val[,1:100], type = "response", s="lambda.1se") 
+df.prob.val$rf <- predict(rf.fit.final, data2.validation, type="prob")[,2] 
+df.prob.val$lasso <- predict(fit.lasso, as.matrix(data2.validation[, -1]), type = "response", s="lambda.1se") 
+# majority rule classification based on averaged probabilities 
+df.prob.val <- df.prob.val %>%
+  mutate(en.class.noglm = ifelse(rowMeans(df.prob.val[ , c("pca", "rf", "lasso")], na.rm=FALSE) > .5, "1", "0")) 
+prob.validation.error <- mean(data2.validation$rating != df.prob.val$en.class.noglm) # test error on validation data
+```
 
+The validation error for our final model is `prob.validation.error`. 
 
-
-
-
+Were we tasked with making a prediction with this model, given a review, we would extract a dtm and then apply our classification model much as we did with the validation dataset. Specifically, we would:
+1. Process the text. This involves cleaning procedures such as removing punctuation, stem words, etc. 
+2. Generate word counts for each word that appears in the review as a data.frame.  
+3. Order the words as appears in the data.frame we used to train our model. 
+4. Convert this data frame to a 1D matrix. 
+5. Predict probability of a positive rating on our LASSO model by feeding the dtm as input to the predict() function, using our fit.lasso as the model, with type='response', s='lambda.1se'. 
+6. Predict probability of a positive rating on our Random Forest model by feeding the dtm as input to the predict() function, using our rf.fit.final as the model, with type='prob'. 
+7. Predict probability of a positive rating on our PCA+LASSO model by applying our PC loadings to the dtm using predict() and then feeding the first 100 PCs to the predict() function, using our fit.lasso as the model, with type='response', s='lambda.1se'.
+8. Average the predicted probabilities from steps 5-7 and classify the review based on majority vote (e.g. assign a "good" rating of 4-5 stars if probability >0.5, else assign a "bad" rating of 1-3 stars)
 
