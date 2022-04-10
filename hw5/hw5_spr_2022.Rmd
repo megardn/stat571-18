@@ -349,7 +349,7 @@ plot(as.party(fit2), main = "Final Tree with Rpart")
 
     b) A brief summary of the fit2
 
-**Answer:** This full tree inclusing all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith) and years of education. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. 
+**Answer:** This full tree including all predictors clearly illustrates the effect of gender on log_outcome, where being female leads to a lower income. The next splits involve several ASVAB scores (Math, Arith) and years of education. Overall, males with a high score in Arithmetic and at least 15.5 years of education are predicted to have the highest income. On the other hand, females with a Math score under 10.5 are predicted to earn the lowest income. 
 
     c) Compare testing errors between fit1 and fit2. Is the training error from fit2 always less than that from fit1? Is the testing error from fit2 always smaller than that from fit1? 
     
@@ -854,7 +854,7 @@ rating <- yelp_data %>%
   transmute(rating = as.factor(ifelse(stars == 5 | stars == 4, 1, 0)) )
 # make data2 with the dtm and rating
 data2 <- data.frame(rating, as.matrix(doc.term.matrix)) 
-head(data2)
+data2[1:10,1:25] # view part of dataframe
 ```
 
 ## Analysis
@@ -1015,7 +1015,7 @@ rf.fit.final$err.rate[150, 1]
 predict.rf <- predict(rf.fit.final, data2.test)
 test.data.error <- mean(data2.test$rating != predict.rf) 
 ```
-The testing error of majority vote is: `test.data.error`. 
+The testing error of majority vote is: `r test.data.error`. 
 
 ## 4. Boosting - REMOVED
 
@@ -1035,7 +1035,7 @@ pc.terms<- prcomp(terms.df, scale=TRUE)
 
 ```{r}
 pc.loading <- pc.terms$rotation[,1:50]
-knitr::kable(pc.loading) #look at loadings for top 50 PCs
+#knitr::kable(pc.loading) #look at loadings for top 50 PCs
 
 #scree plots
 plot(summary(pc.terms)$importance[2,], 
@@ -1050,9 +1050,9 @@ plot(summary(pc.terms)$importance[3, ], pch=16,
      main="Scree Plot of Cumulative PVE")
 ```
 
-Using 100 PCs based on scree plot.
+Using 100 PCs based on where PVE levels off in our scree plot.
 
-ii. Pick up one of your favorite method above and build the predictive model with PC's. Say you use RandomForest.
+ii. Pick up one of your favorite method above and build the predictive model with PC's.
 
 Using relaxed LASSO since it had a smaller testing error on the original data.
 
@@ -1117,7 +1117,7 @@ df.prob <- df.prob %>%
 prob.noglm.testerror <- mean(data2.test$rating != df.prob$en.class.noglm)
 ```
 
-We created several ensemble models based on the Random Forest, LASSO, logistic regression, and PCA+LASSO models fitted above. First we classified reviews based on majority vote of the classifications assigned by each individual model (i.e. the mode of the predictions, similar to the approach used by RandomForest). This resulted in a prediction error of`r ensemble.prediction.error` - far worse than our best fitting model (LASSO). Next, we used each model to calculate the probability of a rating being 4 or above, averaged the probabilities across models, and used this average to classify based on a majority vote (threshold at probability >0.5). This improved our testing error to `r en.prob.testerror`. Finally, we ran the same calculation but without including the probability predicted by our lowest-performing model (logistic regression, testing error = `r testerror.glm`), resulting in a testing error of `r prob.noglm.testerror` for our final ensemble model.
+We created several ensemble models based on the Random Forest, LASSO, logistic regression, and PCA+LASSO models fitted above. First we classified reviews based on majority vote of the classifications assigned by each individual model (i.e. the mode of the predictions, similar to the approach used by RandomForest). This resulted in a prediction error of `r ensemble.prediction.error`; far worse than our best fitting model (LASSO). Next, we used each model to calculate the probability of a rating being 4 or above, averaged the probabilities across models, and used this average to classify based on a majority vote (threshold at probability >0.5). This improved our testing error to `r en.prob.testerror`. Finally, we ran the same calculation but without including the probability predicted by our lowest-performing model (logistic regression, testing error = `r testerror.glm`), resulting in a testing error of `r prob.noglm.testerror` for our final ensemble model.
 
 ## 7. Final model
 
@@ -1149,9 +1149,10 @@ df.prob.val <- df.prob.val %>%
 prob.validation.error <- mean(data2.validation$rating != df.prob.val$en.class.noglm) # test error on validation data
 ```
 
-The validation error for our final model is `prob.validation.error`. 
+The validation error for our final model is `r prob.validation.error`. 
 
 Were we tasked with making a prediction with this model, given a review, we would extract a dtm and then apply our classification model much as we did with the validation dataset. Specifically, we would:
+
 1. Process the text. This involves cleaning procedures such as removing punctuation, stem words, etc. 
 2. Generate word counts for each word that appears in the review as a data.frame.  
 3. Order the words as appears in the data.frame we used to train our model. 
